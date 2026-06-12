@@ -37,7 +37,7 @@ function updateFtpStockPrice(symbol) {
   }
 }
 
-function showGamePage() {
+async function showGamePage() {
   document.getElementById('auth-page').classList.remove('active');
   document.getElementById('game-page').classList.add('active');
 
@@ -52,7 +52,7 @@ function showGamePage() {
   wsConnect(pid, { type: 'join', data: { nickname } });
 
   // Load market data
-  loadMarketData();
+  await loadMarketData();
   loadLeaderboard();
   var sel = document.getElementById("trade-stock-select");
   if (sel) sel.value = gameState.selectedStock || '';
@@ -107,12 +107,9 @@ async function loadInitialKline() {
     if (data && data.length > 0) {
       if (!gameState.candleData['4t']) gameState.candleData['4t'] = {};
       gameState.candleData['4t'][sym] = data;
-      // Trigger chart render if kline mode
-      if (gameState.klinePeriod && gameState.klinePeriod !== 'chart') {
-        var kp = gameState.klinePeriod.replace('kline-', '');
-        if (kp === '4t' && typeof setKlineData === 'function') {
-          setKlineData(data);
-        }
+      // Pre-load kline data even in timeshare mode, so it's ready when user switches
+      if (typeof setKlineData === 'function') {
+        setKlineData(data);
       }
     }
   } catch (e) {

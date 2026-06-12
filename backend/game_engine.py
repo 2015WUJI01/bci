@@ -16,7 +16,7 @@ from backend.config import (
 from backend.database import async_session
 from backend.models import Transaction, PlayerState, Holding, User, Company, CompanyQuarterly
 from backend.websocket_manager import manager, game_state_store
-from sqlalchemy import select, update as sql_update
+from sqlalchemy import select, desc, update as sql_update
 
 logger = logging.getLogger(__name__)
 
@@ -452,21 +452,7 @@ async def init_global_market():
         "position_limit": int(SHARES_OUTSTANDING * 0.30),
     }
 
-    # Restore saved state from DB
-    await load_market_state()
-    await load_all_player_states()
-
-    # Initialize industry cycles
-    for ind in ["tech", "finance", "manufacturing", "energy", "consumer", "healthcare"]:
-        state.industry_cycles[ind] = {
-            "cycle": "normal",
-            "cycle_name": "正常",
-            "cycle_desc": "行业运行平稳",
-            "ticks_in_cycle": 0,
-            "momentum": 0.0,
-        }
-
-    # Load existing companies into stock state (for server restart)
+    # Load existing companies into stock state FIRST (for price restoration)
     try:
         async with async_session() as session:
             rows = await session.execute(select(Company))
@@ -490,6 +476,10 @@ async def init_global_market():
         logger.info("Loaded existing companies into market state")
     except Exception as e:
         logger.warning("Could not load companies on startup: %s", e)
+
+    # Restore saved prices from DB (now companies are in state.stocks)
+    await load_market_state()
+    await load_all_player_states()
 
     # Start loops as background tasks
     asyncio.create_task(price_tick_loop())
@@ -840,7 +830,8 @@ async def price_tick_loop():
                             mark_dirty(pid_m)
 
         # --- Track price history for retail AI trend detection ---
-        state.price_history.append(state.stocks["DM"]["price"])
+        first_stock_ph = next(iter(state.stocks.values()), {})
+        state.price_history.append(first_stock_ph.get("price", 0))
         if len(state.price_history) > 100:
             state.price_history = state.price_history[-100:]
 
@@ -853,12 +844,14 @@ async def price_tick_loop():
         # --- Update daily stats ---
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
         if today_str != state.last_reset_date:
+            ref_stock = next(iter(state.stocks.values()), {})
+            ref_price = ref_stock.get("price", 0)
             if state.last_reset_date:
-                state.prev_close = state.stocks["DM"]["price"]
+                state.prev_close = ref_price
             state.last_reset_date = today_str
-            state.day_open = state.stocks["DM"]["price"]
-            state.day_high = state.stocks["DM"]["price"]
-            state.day_low = state.stocks["DM"]["price"]
+            state.day_open = ref_price
+            state.day_high = ref_price
+            state.day_low = ref_price
             # Recalculate day_start_assets for all human players
             state.day_start_assets.clear()
             for pid, pdata in list(state.players.items()):
@@ -999,7 +992,7 @@ async def price_tick_loop():
             "high": state.day_high,
             "low": state.day_low,
             "prev_close": state.prev_close,
-            "volume": state.stocks["DM"]["volume"],
+            "volume": first_stock.get("volume", 0),
         }
         if state.timeshare:
             msg["data"]["timeshare"] = state.timeshare[-241:]  # last ~6 minutes

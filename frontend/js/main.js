@@ -81,7 +81,6 @@ function handleWsMessage(msg) {
       // Capture trade tape
       if (msg.data.tape) {
         gameState.tape = msg.data.tape;
-        renderTradeTape();
       }
       break;
 
