@@ -1,0 +1,3 @@
+# 股票竞技游戏 - 根目录 requirements
+# Render 会从根目录找这个文件
+-r backend/requirements.txt

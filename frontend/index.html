@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大猫投资 - 股票模拟交易</title>
+<link rel="stylesheet" href="css/style.css?v=3">
+</head>
+<body>
+<!-- Lobby page (hidden by default) -->
+<div id="lobby-page" style="display:none;"></div>
+
+<div id="app">
+  <!-- Auth Page -->
+  <div id="auth-page" class="page active">
+    <div class="auth-container">
+      <div class="auth-box">
+        <div class="auth-header">
+          <h1>📈 大猫投资</h1>
+          <p class="subtitle">入市请谨慎 · 投资有风险</p>
+        </div>
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="tab-login-btn" onclick="switchAuthTab('login')">登录</button>
+          <button class="auth-tab" id="tab-register-btn" onclick="switchAuthTab('register')">注册</button>
+        </div>
+        <div class="auth-body">
+          <!-- Login form -->
+          <div id="auth-login-form" class="auth-form active">
+            <div class="form-group">
+              <label>账号</label>
+              <input type="email" id="login-email" placeholder="请输入账号" maxlength="50" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label>密码</label>
+              <input type="password" id="login-password" placeholder="密码（至少8位）" maxlength="50" autocomplete="off">
+            </div>
+            <div id="auth-msg" class="auth-msg"></div>
+            <button class="btn btn-primary btn-full" id="btn-email-login" onclick="handleLogin()">登录</button>
+          </div>
+          <!-- Register form -->
+          <div id="auth-register-form" class="auth-form">
+            <div class="form-group">
+              <label>账号</label>
+              <input type="email" id="reg-email" placeholder="请输入账号" maxlength="50" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label>密码</label>
+              <input type="password" id="reg-password" placeholder="密码（至少8位）" maxlength="50" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label>确认密码</label>
+              <input type="password" id="reg-password2" placeholder="再次输入密码" maxlength="50" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label>昵称</label>
+              <input type="text" id="reg-nickname" placeholder="游戏内显示的名称" maxlength="20" autocomplete="off">
+            </div>
+            <div id="reg-msg" class="auth-msg"></div>
+            <button class="btn btn-primary btn-full" id="btn-email-register" onclick="handleRegister()">注册</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Trading Page -->
+  <div id="game-page" class="page">
+    <!-- Header -->
+    <div class="game-header">
+      <div class="header-left">
+        <span class="room-code">大猫投资</span>
+        <span class="stock-status" id="stock-status">入市请谨慎 · 投资有风险</span>
+      </div>
+      <div class="header-center">
+        <span class="stock-price-header" id="stock-price-header">¥--</span>
+          <span class="tick-countdown" id="tick-countdown"></span>
+      </div>
+      <div class="header-right">
+        <button class="btn btn-xs btn-secondary" id="btn-toggle-ftp" onclick="toggleFloatingPanel()" title="交易面板" style="font-size:16px;padding:2px 8px;">💼</button>
+
+        <button class="btn btn-xs btn-secondary" id="btn-toggle-company" onclick="toggleCompanyPanel()" title="公司经营" style="font-size:16px;padding:2px 8px;">🏢</button>
+        <button class="btn btn-xs btn-secondary" id="btn-toggle-comprank" onclick="toggleComprankPanel()" title="公司排行" style="font-size:16px;padding:2px 8px;">🏆</button>
+        <button class="btn btn-xs btn-secondary" id="btn-toggle-industry" onclick="toggleIndustryPanel()" title="行业市场" style="font-size:16px;padding:2px 8px;">📊</button>
+                <button class="btn btn-xs btn-danger" id="btn-toggle-admin" onclick="toggleAdminPanel()" title="操盘面板" style="font-size:16px;padding:2px 8px;display:none;">⚡</button>
+        <span class="conn-status disconnected" id="conn-status"><span class="dot"></span><span id="conn-label">未连接</span><span id="ws-latency" style="margin-left:6px;font-size:11px;color:var(--text-muted);"></span></span>
+        <span id="player-count" style="margin-left:8px;font-size:12px;color:var(--text-muted);"></span>
+        <span class="user-email" id="game-user-email" style="font-size:12px;color:var(--text-muted);"></span>
+        <button class="btn btn-sm btn-secondary" onclick="handleLogout()">退出</button>
+      </div>
+    </div>
+
+    <!-- Stock Info Bar -->
+    <div class="stock-info-bar">
+      
+      <span class="sib-symbol" id="sib-symbol">--</span>
+      <span class="sib-name" id="sib-name">--</span>
+      <select id="stock-selector" onchange="selectStock(this.value)" style="margin-left:8px;font-size:12px;padding:2px 6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border-color);border-radius:3px;max-width:200px;">
+        
+        
+      </select>
+      <span class="sib-price" id="stock-price-big">¥--</span>
+      <span id="stock-change-pct">0.00%</span>
+      <span id="stock-change">+0.00</span>
+      <span class="sib-sep">|</span>
+      <span class="sib-stat"><span class="sib-label">今开</span><span id="stock-open">--</span></span>
+      <span class="sib-stat"><span class="sib-label">昨收</span><span id="stock-prev-close">--</span></span>
+      <span class="sib-stat"><span class="sib-label">最高</span><span id="stock-high">--</span></span>
+      <span class="sib-stat"><span class="sib-label">最低</span><span id="stock-low">--</span></span>
+      <span class="sib-stat"><span class="sib-label">成交量</span><span id="stock-volume">0</span></span>
+      <span class="sib-stat"><span class="sib-label">换手率</span><span id="stock-turnover">--</span></span>
+      <span class="sib-stat"><span class="sib-label">振幅</span><span id="stock-amplitude">--</span></span>
+      <span class="sib-stat"><span class="sib-label">市盈率</span><span id="stock-pe">--</span></span>
+      <span class="sib-stat"><span class="sib-label">市净率</span><span id="stock-pb">--</span></span>
+    </div>
+
+    <div class="news-ticker" id="news-ticker" style="background:var(--bg-card);border-bottom:1px solid var(--border-color);padding:3px 12px;font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">暂无新闻</div>
+
+    <!-- Main Grid (center + right, left column = floating panel) -->
+    <div class="game-grid">
+      <!-- Center: K-line Chart + Holdings -->
+      <div class="panel-center">
+        <div class="panel kline-panel" style="flex:1;">
+          <div class="panel-header">K线图</div>
+          <div class="kline-container">
+            <canvas id="kline-canvas" width="400" height="360"></canvas>
+            <div class="kline-axis-x" id="kline-time">--:--</div>
+            <div class="indicator-selector">
+              <button class="indicator-btn active" data-indicator="MACD" onclick="setIndicator('MACD')">MACD</button>
+              <button class="indicator-btn" data-indicator="KDJ" onclick="setIndicator('KDJ')">KDJ</button>
+              <button class="indicator-btn" data-indicator="RSI" onclick="setIndicator('RSI')">RSI</button>
+              <button class="indicator-btn" data-indicator="BOLL" onclick="setIndicator('BOLL')">BOLL</button>
+            </div>
+            <div class="kline-period-selector">
+              <button class="kline-period-btn active" data-period="chart" onclick="switchKlinePeriod('chart')">分时</button>
+              <button class="kline-period-btn" data-period="kline-4t" onclick="switchKlinePeriod('kline-4t')">K线</button>
+              <button class="kline-period-btn" data-period="kline-1t" onclick="switchKlinePeriod('kline-1t')">Tick</button>
+              <button class="kline-period-btn" data-period="kline-20t" onclick="switchKlinePeriod('kline-20t')">1分</button>
+              <button class="kline-period-btn" data-period="kline-1d" onclick="switchKlinePeriod('kline-1d')">日K</button>
+              <button class="kline-period-btn" data-period="kline-1w" onclick="switchKlinePeriod('kline-1w')">周K</button>
+              <button class="kline-period-btn" data-period="kline-1m" onclick="switchKlinePeriod('kline-1m')">月K</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Order Book + Tape + Tabbed -->
+      <div class="panel-right">
+        <!-- Trade Tape -->
+        <div class="panel panel-tapetape">
+          <div class="panel-header">成交明细</div>
+          <div class="tape-content" id="tape-content">
+            <div class="tape-empty">暂无成交</div>
+          </div>
+        </div>
+
+        <!-- Tabbed Panel -->
+        <div class="panel panel-tabbed">
+          <div class="panel-tabs">
+            <button class="tab-btn active" data-tab="leaderboard" onclick="switchRightTab('leaderboard')">排行榜</button>
+            <button class="tab-btn" data-tab="industry" onclick="switchRightTab('industry')">行业</button>
+          </div>
+          <div class="tab-panel active" id="tab-leaderboard">
+            <div class="leaderboard" id="leaderboard"></div>
+          </div>
+                    <div class="tab-panel" id="tab-industry">
+            <div class="industry-content" id="industry-content">
+              <div class="industry-empty">暂无行业数据</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Trading Panel (draggable) -->
+  <div id="floating-trade-panel" class="ftp">
+    <div class="ftp-header" id="ftp-header">
+      <span class="ftp-title">💼 交易面板 <span id="pf-nickname-btn" style="font-size:11px;font-weight:400;color:var(--text-muted);cursor:pointer;" onclick="renamePlayer()">[改名]</span></span>
+      <div class="ftp-actions">
+        <button class="ftp-btn" onclick="minimizeFtp()" title="最小化">─</button>
+        <button class="ftp-btn" onclick="closeFtp()" title="关闭">✕</button>
+      </div>
+    </div>
+    <div class="ftp-body" id="ftp-body">
+      <!-- Portfolio compact -->
+      <div class="ftp-section">
+        <div class="ftp-portfolio">
+          <div class="ftp-pf-row">
+            <span class="ftp-pf-label">总资产</span>
+            <span class="ftp-pf-value" id="pf-total">¥10,000.00</span>
+            <span class="ftp-pf-pnl" id="pf-pnl">¥0.00 (0.00%)</span>
+          </div>
+          <div class="ftp-pf-sub">
+            <span>可用 <b id="pf-cash">¥10,000.00</b></span>
+            <span>市值 <b id="pf-stock-value">¥0.00</b></span>
+            <span>当日 <b id="pf-day-pnl">¥0.00</b></span>
+          </div>
+          <div class="ftp-pf-sub" style="margin-top:2px;">
+            <span>购买力 <b id="pf-buying-power" style="color:#3b82f6;">¥10,000.00</b></span>
+          </div>
+        </div>
+      </div>
+      <!-- Stock selector -->
+      <div class="ftp-section">
+        <div class="ftp-trade-row">
+          <span class="ftp-trade-label">股票</span>
+          <select id="trade-stock-select" onchange="selectStock(this.value)" style="flex:1;padding:4px 8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12px;">
+          </select>
+          <span id="ftp-stock-price" style="margin-left:6px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;min-width:65px;text-align:right;">¥--</span>
+        </div>
+      </div>
+      <!-- Trading form -->
+      <div class="ftp-section">
+        <div class="ftp-order-type">
+          <button class="ftp-type-btn active" data-type="market" onclick="switchOrderType('market')">市价</button>
+          <button class="ftp-type-btn" data-type="limit" onclick="switchOrderType('limit')">挂单</button>
+        </div>
+        <div class="ftp-trade-row hidden" id="ftp-limit-row">
+          <span class="ftp-trade-label">挂单价</span>
+          <input type="number" id="trade-limit-price" min="0.01" step="0.0001" placeholder="输入目标价" autocomplete="off">
+        </div>
+        <div class="ftp-trade-row">
+          <span class="ftp-trade-label">数量</span>
+          <input type="number" id="trade-qty" min="1" value="100" step="100">
+        </div>
+        <div class="ftp-estimate" id="trade-estimate">预估: ¥0.00</div>
+        <div class="ftp-trade-btns">
+          <button class="btn btn-buy btn-sm" id="btn-buy">买入</button>
+          <button class="btn btn-sell btn-sm" id="btn-sell">卖出</button>
+        </div>
+        <div class="ftp-quick-btns">
+          <div class="quick-label">快速交易</div>
+          <div class="quick-buy-btns">
+            <button class="btn btn-xs btn-buy" onclick="quickBuy(10000)">+1万股</button>
+            <button class="btn btn-xs btn-buy" onclick="quickBuy(50000)">+5万股</button>
+            <button class="btn btn-xs btn-buy" onclick="quickBuy(100000)">+10万股</button>
+            <button class="btn btn-xs btn-buy" onclick="quickBuy(500000)">+50万股</button>
+            <button class="btn btn-xs btn-buy" onclick="quickBuy(1000000)">+100万股</button>
+          </div>
+          <div class="quick-sell-btns">
+            <button class="btn btn-xs btn-sell" onclick="quickSell(10000)">-1万股</button>
+            <button class="btn btn-xs btn-sell" onclick="quickSell(50000)">-5万股</button>
+            <button class="btn btn-xs btn-sell" onclick="quickSell(100000)">-10万股</button>
+            <button class="btn btn-xs btn-sell" onclick="quickSell(500000)">-50万股</button>
+            <button class="btn btn-xs btn-sell" onclick="quickSell(1000000)">-100万股</button>
+          </div>
+        </div>
+        <div id="trade-msg" class="trade-msg" style="font-size:11px;min-height:16px;"></div>
+      </div>
+      <!-- Pending orders -->
+      <div class="ftp-section ftp-orders-section">
+        <div class="ftp-orders-header">
+          <span>我的委托</span>
+          <div>
+            <button class="btn btn-xs btn-secondary" onclick="handleCancelAllOrders()" style="font-size:10px;padding:1px 5px;margin-right:4px;">一键撤单</button>
+            <button class="btn btn-xs btn-secondary" onclick="loadMyOrders()" style="font-size:10px;padding:1px 5px;">刷新</button>
+          </div>
+        </div>
+        <div class="ftp-orders" id="pending-orders-content">
+          <div class="pending-orders-empty">暂无委托</div>
+        </div>
+      </div>
+      <!-- Holdings -->
+      <div class="ftp-section ftp-holdings-section">
+        <div class="ftp-holdings-header">
+          <span>持仓明细</span>
+          <button class="btn btn-xs btn-secondary" onclick="refreshHoldings()" style="font-size:10px;padding:1px 5px;">刷新</button>
+        </div>
+        <div class="holdings-table ftp-holdings-table" id="holdings-table">
+          <div class="holding-row holding-header">
+            <span>股票</span><span>数量</span><span>均价</span><span>现价</span><span>市值</span><span>盈亏</span><span>收益率</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Short/Chat/Financial panels removed -->
+
+<!-- Admin Control Panel -->
+<div id="floating-admin-panel" class="ftp admin-panel" style="display:none;">
+  <div class="ftp-header" id="ftp-admin-header">
+    <span class="ftp-title">⚡ 操盘面板</span>
+    <div class="ftp-actions">
+      <button class="ftp-btn" onclick="closeAdminPanel()" title="关闭">✕</button>
+    </div>
+  </div>
+  <div class="ftp-body" id="ftp-admin-body">
+    <div class="ftp-section">
+      <div class="admin-cash" id="admin-cash">可用资金: ¥--</div>
+      <div class="admin-price" id="admin-stock-price">当前股价: ¥--</div>
+      <div class="admin-target-row" style="margin-top:4px;">
+        <select id="admin-stock-select" onchange="selectStock(this.value)" style="flex:1;padding:4px 8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12px;"></select>
+      </div>
+    </div>
+    <div class="ftp-section">
+      <div class="admin-section-title">📈 快速买入</div>
+      <div class="admin-btn-row">
+        <button class="btn btn-sm btn-buy" onclick="adminBuy(10000)">+1万股</button>
+        <button class="btn btn-sm btn-buy" onclick="adminBuy(50000)">+5万股</button>
+        <button class="btn btn-sm btn-buy" onclick="adminBuy(100000)">+10万股</button>
+        <button class="btn btn-sm btn-buy" onclick="adminBuy(500000)">+50万股</button>
+        <button class="btn btn-sm btn-buy" onclick="adminBuy(1000000)">+100万股</button>
+      </div>
+      <div class="admin-btn-row">
+        <button class="btn btn-sm btn-danger" onclick="adminBuyAll()">⚡全仓买入</button>
+      </div>
+    </div>
+    <div class="ftp-section">
+      <div class="admin-section-title">📉 快速卖出</div>
+      <div class="admin-btn-row">
+        <button class="btn btn-sm btn-sell" onclick="adminSell(10000)">-1万股</button>
+        <button class="btn btn-sm btn-sell" onclick="adminSell(50000)">-5万股</button>
+        <button class="btn btn-sm btn-sell" onclick="adminSell(100000)">-10万股</button>
+        <button class="btn btn-sm btn-sell" onclick="adminSell(500000)">-50万股</button>
+        <button class="btn btn-sm btn-sell" onclick="adminSell(1000000)">-100万股</button>
+      </div>
+      <div class="admin-btn-row">
+        <button class="btn btn-sm btn-warning" onclick="adminSellAll()">⚡清仓卖出</button>
+      </div>
+    </div>
+    <div class="ftp-section">
+      <div class="admin-section-title">🎯 目标价操作</div>
+      <div class="admin-target-row">
+        <input type="number" id="admin-target-price" class="admin-input" placeholder="目标价" step="0.0001">
+        <button class="btn btn-sm btn-buy" onclick="adminBuyToTarget()">拉到目标价</button>
+      </div>
+      <div class="admin-target-row" style="margin-top:4px;">
+        <input type="number" id="admin-dump-qty" class="admin-input" placeholder="股数" value="100000">
+        <button class="btn btn-sm btn-sell" onclick="adminDumpToTarget()">砸到目标价</button>
+      </div>
+    </div>
+    <div class="ftp-section">
+      <div class="admin-status" id="admin-status">就绪</div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+  <!-- Company Registration Modal -->
+  <div id="company-reg-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>🚀 注册公司</h2>
+        <p style="font-size:13px;color:var(--text-muted);margin-top:4px;">创建你的公司，发行股票，开始经营！</p>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>公司名称</label>
+          <input type="text" id="company-name-input" placeholder="输入公司名称（1-20字）" maxlength="20">
+        </div>
+        <div class="form-group">
+          <label>选择行业</label>
+          <div class="industry-grid" id="industry-grid">
+            <div class="industry-card selected" data-industry="tech" onclick="selectIndustry('tech')">
+              <div class="industry-icon">💻</div>
+              <div class="industry-name">科技</div>
+              <div class="industry-desc">高增长、高波动</div>
+            </div>
+            <div class="industry-card" data-industry="finance" onclick="selectIndustry('finance')">
+              <div class="industry-icon">🏦</div>
+              <div class="industry-name">金融</div>
+              <div class="industry-desc">稳定增长、低波动</div>
+            </div>
+            <div class="industry-card" data-industry="manufacturing" onclick="selectIndustry('manufacturing')">
+              <div class="industry-icon">🏭</div>
+              <div class="industry-name">制造业</div>
+              <div class="industry-desc">稳定收益、周期性强</div>
+            </div>
+            <div class="industry-card" data-industry="energy" onclick="selectIndustry('energy')">
+              <div class="industry-icon">⚡</div>
+              <div class="industry-name">能源</div>
+              <div class="industry-desc">强周期性、政策敏感</div>
+            </div>
+            <div class="industry-card" data-industry="consumer" onclick="selectIndustry('consumer')">
+              <div class="industry-icon">🛒</div>
+              <div class="industry-name">消费</div>
+              <div class="industry-desc">防御性、稳定现金流</div>
+            </div>
+            <div class="industry-card" data-industry="healthcare" onclick="selectIndustry('healthcare')">
+              <div class="industry-icon">💊</div>
+              <div class="industry-name">医药</div>
+              <div class="industry-desc">防御性、高利润</div>
+            </div>
+          </div>
+        </div>
+        <div id="company-reg-msg" class="auth-msg" style="margin-top:8px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="createCompany()">创建公司</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quarterly Decision Modal -->
+  <div id="decision-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:500px;">
+      <div class="modal-header">
+        <h2>📋 季度经营决策</h2>
+        <p id="decision-quarter" style="font-size:13px;color:var(--text-muted);margin-top:4px;"></p>
+      </div>
+      <div class="modal-body" id="decision-body">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="hideDecisionModal()" style="font-size:12px;">稍后决定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cash Action Modal -->
+  <div id="cash-action-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:600px;">
+      <div class="modal-header">
+        <h2>💰 公司现金操作</h2>
+        <p style="font-size:13px;color:var(--text-muted);margin-top:4px;">使用公司现金执行战略操作</p>
+      </div>
+      <div class="modal-body" id="cash-action-body">
+        <div style="text-align:center;padding:12px;margin-bottom:12px;background:var(--bg-card);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+          <span style="font-size:13px;color:var(--text-muted);">公司现金：</span>
+          <span id="cash-action-balance" style="font-size:18px;font-weight:700;color:var(--accent-green);">¥0</span>
+        </div>
+        <div class="cash-action-grid" id="cash-action-grid"></div>
+        <div id="cash-action-detail" style="display:none;margin-top:12px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="hideCashActionModal()" style="font-size:12px;">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Company Ranking Panel -->
+  <div id="floating-comprank-panel" class="ftp comprank-panel">
+    <div class="ftp-header" id="ftp-comprank-header">
+      <span class="ftp-title">🏆 公司排行</span>
+      <div class="ftp-actions">
+        <button class="ftp-btn" onclick="minimizeComprankPanel()" title="最小化">─</button>
+        <button class="ftp-btn" onclick="closeComprankPanel()" title="关闭">✕</button>
+        <button class="ftp-btn" onclick="refreshComprank()" title="刷新" style="font-weight:bold;">↻</button>
+      </div>
+    </div>
+    <div class="ftp-body" id="ftp-comprank-body">
+      <div class="ftp-section">
+        <div class="comprank-table" id="comprank-table"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Industry Market Panel -->
+  <div id="floating-industry-panel" class="ftp industry-panel" style="width:550px;">
+    <div class="ftp-header" id="ftp-industry-header">
+      <span class="ftp-title">📊 行业市场</span>
+      <div class="ftp-actions">
+        <button class="ftp-btn" onclick="minimizeIndustryPanel()" title="最小化">─</button>
+        <button class="ftp-btn" onclick="closeIndustryPanel()" title="关闭">✕</button>
+        <button class="ftp-btn" onclick="refreshIndustryPanel()" title="刷新" style="font-weight:bold;">↻</button>
+      </div>
+    </div>
+    <div class="ftp-body" id="ftp-industry-body">
+      <div class="ftp-section">
+        <div id="industry-market-content" style="max-height:60vh;overflow-y:auto;">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Company Panel -->
+  <div id="floating-company-panel" class="ftp company-panel">
+    <div class="ftp-header" id="ftp-company-header">
+      <span class="ftp-title">🏢 公司经营</span>
+      <div class="ftp-actions">
+        <button class="ftp-btn" onclick="minimizeCompanyPanel()" title="最小化">─</button>
+        <button class="ftp-btn" onclick="closeCompanyPanel()" title="关闭">✕</button>
+      </div>
+    </div>
+    <div class="ftp-body" id="ftp-company-body">
+      <div class="ftp-section">
+        <div class="company-hero" id="company-hero">
+          <div class="company-name" id="comp-name">--</div>
+          <div class="company-symbol" id="comp-symbol">--</div>
+          <div class="company-industry" id="comp-industry">--</div>
+        </div>
+      </div>
+      <div class="ftp-section">
+        <div class="company-stats">
+          <div class="comp-stat-row">
+            <span class="comp-stat-label">股价</span>
+            <span class="comp-stat-value price-up" id="comp-price">¥--</span>
+          </div>
+          <div class="comp-stat-row">
+            <span class="comp-stat-label">估值</span>
+            <span class="comp-stat-value" id="comp-valuation">--</span>
+          </div>
+          <div class="comp-stat-row">
+            <span class="comp-stat-label">总资产</span>
+            <span class="comp-stat-value" id="comp-assets">--</span>
+          </div>
+          <div class="comp-stat-row">
+            <span class="comp-stat-label">现金</span>
+            <span class="comp-stat-value" id="comp-cash">--</span>
+          </div>
+          <div class="comp-stat-row">
+            <span class="comp-stat-label">营收</span>
+            <span class="comp-stat-value" id="comp-revenue">--</span>
+          </div>
+          <div class="comp-stat-row">
+            <span class="comp-stat-label">利润</span>
+            <span class="comp-stat-value" id="comp-profit">--</span>
+          </div>
+          <div class="comp-stat-row">
+            <span class="comp-stat-label">员工</span>
+            <span class="comp-stat-value" id="comp-employees">--</span>
+          </div>
+          <div class="comp-stat-row">
+            <span class="comp-stat-label">季度</span>
+            <span class="comp-stat-value" id="comp-quarter">--</span>
+          </div>
+          <div class="comp-stat-row alloc-row-comp">
+            <span class="comp-stat-label">储存</span>
+            <span class="comp-stat-value" id="comp-alloc-reserve">25%</span>
+          </div>
+          <div class="comp-stat-row alloc-row-comp">
+            <span class="comp-stat-label">销售</span>
+            <span class="comp-stat-value" id="comp-alloc-sales">25%</span>
+          </div>
+          <div class="comp-stat-row alloc-row-comp">
+            <span class="comp-stat-label">分红</span>
+            <span class="comp-stat-value" id="comp-alloc-dividend">25%</span>
+          </div>
+          <div class="comp-stat-row alloc-row-comp">
+            <span class="comp-stat-label">研究</span>
+            <span class="comp-stat-value" id="comp-alloc-research">25%</span>
+          </div>
+          <div style="text-align:center;padding:8px 0;">
+            <button class="btn btn-sm" onclick="showAllocAdjustModal()" style="font-size:12px;">调整分配</button>
+            <button class="btn btn-sm" onclick="showCashActionModal()" style="font-size:12px;margin-top:4px;">现金操作</button>
+            <button class="btn btn-sm" onclick="showQuarterlyHistory()" style="font-size:12px;margin-top:4px;">季度财报</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+<script src="js/utils.js"></script>
+<script src="js/kline.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js?v=2"></script>
+<script src="js/websocket.js?v=2"></script>
+<script src="js/gameState.js"></script>
+<script src="js/ui/game.js?v=14"></script>
+<script src="js/main.js?v=2"></script>
+</body>
+</html>
