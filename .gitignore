@@ -3,3 +3,15 @@ __pycache__/
 *.db
 *.log
 .env
+_*.py
+deploy.py
+fix_*.py
+patch_*.py
+*.bat
+*.sh
+render.yaml
+zeabur.json
+requirements.txt
+backend/requirements.txt
+backend/admin_trade.py
+qr_share.png
