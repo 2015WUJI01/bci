@@ -1869,6 +1869,46 @@ def calc_player_assets(player_id: str) -> tuple:
     return (round(total, 2), ratio)
 
 
+def calc_player_portfolio(state, player_id, player_data, holdings_data):
+    """Build portfolio dict: holdings list, total_assets, buying_power, pnl.
+    Shared by ws.py (join/refresh) and execute_trade to eliminate duplication."""
+    pdata = player_data
+    cash = pdata.get("cash", 0)
+    holdings_list = []
+    total_assets = cash
+    for sym, h in holdings_data.items():
+        sp = state.stocks.get(sym, {})
+        cur_price = sp.get("price", 0)
+        mv = round(h["qty"] * cur_price, 2)
+        pnl = round(mv - h["qty"] * h["avg_cost"], 2) if h["qty"] > 0 else 0
+        short_mv = round(h.get("short_qty", 0) * cur_price, 2)
+        short_pnl = round((h.get("short_avg_cost", 0) - cur_price) * h.get("short_qty", 0), 2) if h.get("short_qty", 0) > 0 else 0
+        holdings_list.append({
+            "symbol": sym, "name": sp.get("name", sym),
+            "quantity": h["qty"], "avg_cost": h["avg_cost"],
+            "current_price": cur_price, "market_value": mv,
+            "pnl": pnl, "frozen_qty": h.get("frozen_qty", 0),
+            "short_qty": h.get("short_qty", 0),
+            "short_avg_cost": h.get("short_avg_cost", 0),
+            "short_market_value": short_mv, "short_pnl": short_pnl,
+        })
+        total_assets += mv - short_mv
+    margin_debt = pdata.get("margin_debt", 0)
+    total_assets -= margin_debt
+    frozen_cash = pdata.get("frozen_cash", 0)
+    buying_power = round((cash - frozen_cash) * 2.0, 2)
+    total_pnl = round(total_assets - STARTING_CASH, 2)
+    pnl_percent = round((total_pnl / STARTING_CASH) * 100, 2) if STARTING_CASH > 0 else 0
+    return {
+        "cash": round(cash, 2), "holdings": holdings_list,
+        "total_assets": round(total_assets, 2),
+        "frozen_cash": frozen_cash, "margin_debt": margin_debt,
+        "buying_power": buying_power, "total_pnl": total_pnl,
+        "pnl_percent": pnl_percent,
+        "day_start_assets": state.day_start_assets.get(player_id, total_assets),
+    }
+
+
 async def check_forced_liquidation():
     """检查所有玩家担保比例，跌破 130% 时强制平仓归还融资负债。"""
     state = get_global_state()
