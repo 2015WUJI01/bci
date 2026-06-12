@@ -113,6 +113,12 @@ function handleWsMessage(msg) {
       updatePortfolio(msg.data);
       break;
 
+    case 'orderbook':
+      gameState.orderBook = msg.data || {};
+      if (typeof renderOrderBook === 'function') {
+        renderOrderBook();
+      }
+      break;
 
     case 'order_placed':
       showToast(`限价单已提交: DM ${msg.data.order_type === 'buy' ? '买入' : '卖出'} ${msg.data.quantity}股 @ ¥${msg.data.price.toFixed(4)}`, 'success');
@@ -177,19 +183,11 @@ function renderStockInfo() {
   document.getElementById('stock-low').textContent = ds.low != null ? ds.low.toFixed(4) : '--';
   document.getElementById('stock-volume').textContent = s.volume >= 10000 ? (s.volume/10000).toFixed(1) + '万' : s.volume;
 
-  // Market cap
-  const marketCap = s.price * 300000000; // SHARES_OUTSTANDING
-  document.getElementById('stock-market-cap').textContent = '¥' + (marketCap / 100000000).toFixed(2) + '亿';
-
   // 新指标
   document.getElementById('stock-turnover').textContent = gameState.turnoverRate != null ? gameState.turnoverRate.toFixed(2) + '%' : '--';
   document.getElementById('stock-amplitude').textContent = gameState.amplitude != null ? gameState.amplitude.toFixed(2) + '%' : '--';
   document.getElementById('stock-pe').textContent = gameState.pe != null ? gameState.pe.toFixed(2) : '--';
   document.getElementById('stock-pb').textContent = gameState.pb != null ? gameState.pb.toFixed(2) : '--';
-  document.getElementById('stock-weibi').textContent = gameState.weiBi != null ? gameState.weiBi.toFixed(2) + '%' : '--';
-  document.getElementById('stock-weicha').textContent = gameState.weiCha != null ? gameState.weiCha.toFixed(0) : '--';
-  document.getElementById('stock-buy-vol').textContent = gameState.buyVolume != null ? (gameState.buyVolume >= 10000 ? (gameState.buyVolume/10000).toFixed(1) + '万' : gameState.buyVolume) : '--';
-  document.getElementById('stock-sell-vol').textContent = gameState.sellVolume != null ? (gameState.sellVolume >= 10000 ? (gameState.sellVolume/10000).toFixed(1) + '万' : gameState.sellVolume) : '--';
 
   // Color (preserve existing classes, just add/remove price color)
   const pc = priceClass(s.change);

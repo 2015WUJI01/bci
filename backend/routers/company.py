@@ -159,6 +159,7 @@ async def get_my_company(user: User = Depends(_get_current_user)):
         employees=company.employees,
         quarter=company.quarter,
         alloc_pcts=alloc,
+        tech_points=company.tech_points,
         share_price=current_price,
         shares_outstanding=company.shares_outstanding,
         valuation=valuation,
@@ -281,6 +282,16 @@ async def cash_action(req: CashActionRequest, user: User = Depends(_get_current_
             c.cash -= amount
             c.employees += new_employees
             msg = f"招聘 {new_employees} 名新员工"
+
+        elif action == "layoff":
+            qty = int(req.amount) if req.amount > 0 else 1
+            qty = min(qty, c.employees - 1)  # keep at least 1 employee
+            if qty <= 0:
+                raise HTTPException(400, "员工数不足，无法裁员")
+            severance = qty * 2000  # severance pay
+            c.cash -= severance
+            c.employees -= qty
+            msg = f"裁员 {qty} 人，支付遣散费 ¥{severance:,.0f}，每季度节省 ¥{qty * 800:,.0f}"
 
         elif action == "marketing":
             c.cash -= amount

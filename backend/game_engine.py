@@ -3457,6 +3457,14 @@ async def _process_quarterly(state, tick_count):
                     if random.random() < 0.2:
                         c.employees = max(5, c.employees - random.randint(1, 2))
 
+                # Accumulate tech points based on R&D spending
+                # Each ¥1000 R&D = 1 tech point, +10% bonus from existing tech (compounding)
+                tech_gain = rd_spend / 1000 * (1 + c.tech_points * 0.001)
+                c.tech_points = round(c.tech_points + max(0, tech_gain), 1)
+                # Tech points slowly decay if no R&D investment (5% per quarter)
+                if rd_spend < 100:
+                    c.tech_points = round(max(0, c.tech_points * 0.95), 1)
+
                 # Update share price based on new fundamentals
                 nav = max(c.total_assets / max(c.shares_outstanding, 1), 1.0)
                 eps = net_profit / max(c.shares_outstanding, 1)

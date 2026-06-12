@@ -102,6 +102,7 @@ class Company(Base):
     employees = Column(Integer, nullable=False, default=10)
     quarter = Column(Integer, nullable=False, default=1)
     alloc_pcts = Column(String(200), nullable=False, default='{"reserve":25,"sales":25,"dividend":25,"research":25}')
+    tech_points = Column(Float, nullable=False, default=0.0)
     share_price = Column(Float, nullable=False, default=10.0)
     shares_outstanding = Column(Integer, nullable=False, default=10_000_000)
     created_at = Column(DateTime, default=lambda: datetime.utcnow())

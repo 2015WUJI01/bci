@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi import Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -164,6 +166,23 @@ async def player_orders(player_id: str = Query(...)):
                 })
     result.sort(key=lambda x: x["created_at"], reverse=True)
     return result
+
+
+@router.get("/kline")
+async def market_kline(symbol: str = Query(""), period: str = Query("4t")):
+    """Get historical candle data for a stock symbol."""
+    from backend.game_engine import get_global_state
+    state = get_global_state()
+    period_map = {"1t": state.candles_1t, "4t": state.candles_4t, "20t": state.candles_20t, "1d": state.candles_1d}
+    candles = period_map.get(period, state.candles_4t)
+    data = candles.get(symbol, [])
+    if not data:
+        # Return a dummy candle if no data yet
+        price = state.stocks.get(symbol, {}).get("price", 100)
+        now_ms = int(datetime.utcnow().timestamp() * 1000)
+        dummy = {"time": now_ms, "open": price, "high": price, "low": price, "close": price}
+        return [dummy]
+    return data[-200:]
 
 
 @router.get("/industry")

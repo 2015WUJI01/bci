@@ -43,8 +43,10 @@ function wsConnect(playerId, initialMsg) {
     console.log('WS disconnected');
     updateConnStatus(false);
     wsReconnectTimer = setTimeout(() => {
-      if (gameState.playerId) {
-        wsConnect(gameState.playerId, initialMsg);
+      var pid = authUserId || gameState.playerId;
+      if (pid) {
+        var nick = authUsername || (authEmail ? authEmail.split('@')[0] : pid.slice(0, 8));
+        wsConnect(pid, { type: 'join', data: { nickname: nick } });
       }
     }, 3000);
   };
@@ -61,9 +63,14 @@ function wsSend(type, data) {
   }
 }
 
-// Heartbeat
-window.heartbeatInterval = setInterval(() => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'ping' }));
-  }
-}, 30000);
+// Heartbeat — survives logout by using local interval
+var _hbInterval = null;
+function _startHeartbeat() {
+  if (_hbInterval) clearInterval(_hbInterval);
+  _hbInterval = setInterval(function() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'ping' }));
+    }
+  }, 30000);
+}
+_startHeartbeat();

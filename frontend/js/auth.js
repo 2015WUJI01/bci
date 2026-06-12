@@ -134,7 +134,6 @@ function handleLogout() {
   if (window.tradesInterval) clearInterval(window.tradesInterval);
   if (window.equityInterval) clearInterval(window.equityInterval);
   if (window.ordersInterval) clearInterval(window.ordersInterval);
-  if (window.heartbeatInterval) clearInterval(window.heartbeatInterval);
   document.getElementById('game-page').classList.remove('active');
 
   authToken = null;

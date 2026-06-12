@@ -54,7 +54,6 @@ function showGamePage() {
   // Load market data
   loadMarketData();
   loadLeaderboard();
-    renderTradeTape();
   var sel = document.getElementById("trade-stock-select");
   if (sel) sel.value = gameState.selectedStock || '';
   renderNews();
@@ -85,6 +84,7 @@ async function loadMarketData() {
     if (pcEl) pcEl.textContent = "👤 " + (data.players_online || 0);
     renderStockSelector();
     renderStockInfo();
+    loadInitialKline();
     // 首次加载时渲染图表
     if (typeof drawTimeshare === "function" && gameState.klinePeriod === "chart") {
       var tsSym = gameState.selectedStock || (gameState.stocks.length > 0 ? gameState.stocks[0].symbol : "");
@@ -95,6 +95,21 @@ async function loadMarketData() {
     }
   } catch (e) {
     console.error('loadMarketData error', e);
+  }
+}
+
+async function loadInitialKline() {
+  var sym = gameState.selectedStock || (gameState.stocks.length > 0 ? gameState.stocks[0].symbol : "");
+  if (!sym) return;
+  try {
+    // Load 4t candles as initial data
+    var data = await apiGet('/api/market/kline?symbol=' + sym + '&period=4t');
+    if (data && data.length > 0) {
+      if (!gameState.candleData['4t']) gameState.candleData['4t'] = {};
+      gameState.candleData['4t'][sym] = data;
+    }
+  } catch (e) {
+    // Silent — WS will provide data when connected
   }
 }
 
@@ -115,7 +130,7 @@ function selectStock(symbol) {
     b.classList.toggle('active', b.dataset.symbol === symbol);
   });
   renderStockInfo();
-    renderTradeTape();
+  renderOrderBook();
   var sel = document.getElementById("trade-stock-select");
   if (sel) sel.value = gameState.selectedStock || '';
   var adminSel = document.getElementById("admin-stock-select");
@@ -134,7 +149,6 @@ function selectStock(symbol) {
     var tsd = gameState.timeshare[tsSym2] || [];
     setTimeshareData(tsd);
   }
-  loadIndustryData();
   // Update day kline if applicable
   if (period === 'kline-1d' || period === 'kline-1w' || period === 'kline-1m') {
     var dailyCd = gameState.candleData['1d'];
@@ -154,8 +168,6 @@ function switchRightTab(tab) {
     p.classList.toggle('active', p.id === 'tab-' + tab);
   });
   // Redraw equity curve when switching to equity tab
-  if (tab === 'industry') loadIndustryData();
-
 }
 
 let currentOrderType = 'market';
@@ -326,28 +338,55 @@ function renderHoldings() {
   el.innerHTML = html;
 }
 
-function renderTradeTape() {
-  const el = document.getElementById('tape-content');
+function renderOrderBook() {
+  const el = document.getElementById('orderbook-content');
   if (!el) return;
-  var tape = gameState.tape || [];
-  var selSym = gameState.selectedStock || (gameState.stocks.length > 0 ? gameState.stocks[0].symbol : "");
-  tape = tape.filter(function(t) { return !t.symbol || t.symbol === selSym; });
-  if (tape.length === 0) {
-    el.innerHTML = '<div class="tape-empty">暂无成交</div>';
+  var sym = gameState.selectedStock || (gameState.stocks.length > 0 ? gameState.stocks[0].symbol : "");
+  document.getElementById('ob-symbol').textContent = sym || '';
+  var ob = gameState.orderBook || {};
+  var book = ob[sym] || {bids: [], asks: []};
+  var bids = (book.bids || []).slice(0, 8);
+  var asks = (book.asks || []).slice(0, 8);
+
+  if (bids.length === 0 && asks.length === 0) {
+    el.innerHTML = '<div class="ob-empty">暂无挂单</div>';
     return;
   }
-  el.innerHTML = tape.map(t => {
-    const side = t.side || (t.type === 'buy' ? 'active_buy' : 'active_sell');
-    const isActiveBuy = side === 'active_buy';
-    const arrow = isActiveBuy ? '↑' : '↓';
-    const cls = isActiveBuy ? 'active-buy' : 'active-sell';
-    return `<div class="tape-row ${cls}">
-      <span class="tape-time">${t.time || '--'}</span>
-      <span class="tape-arrow">${arrow}</span>
-      <span class="tape-price">${t.price.toFixed(2)}</span>
-      <span class="tape-qty">${t.quantity}</span>
-    </div>`;
-  }).join('');
+
+  // Find max total for depth visualization
+  var maxQty = 1;
+  bids.concat(asks).forEach(function(o) { if (o.quantity > maxQty) maxQty = o.quantity; });
+
+  var html = '<div class="ob-grid">' +
+    '<div class="ob-header"><span>买盘</span><span>价格</span><span>数量</span></div>';
+
+  // Bids (buys) - show in descending price, most recent at top
+  bids.reverse().forEach(function(o) {
+    var pct = (o.quantity / maxQty * 100).toFixed(0);
+    html += '<div class="ob-row ob-bid">' +
+      '<div class="ob-bar ob-bar-bid" style="width:' + pct + '%"></div>' +
+      '<span class="ob-price ob-bid-price">' + o.price.toFixed(2) + '</span>' +
+      '<span class="ob-qty">' + (o.quantity >= 10000 ? (o.quantity/10000).toFixed(1)+'万' : o.quantity) + '</span>' +
+      '</div>';
+  });
+
+  // Spread line
+  var mid = (bids.length > 0 && asks.length > 0) ?
+    ((bids[bids.length-1].price + asks[0].price) / 2).toFixed(2) : '--';
+  html += '<div class="ob-spread"><span>价差</span><span>' + mid + '</span></div>';
+
+  // Asks (sells)
+  asks.forEach(function(o) {
+    var pct = (o.quantity / maxQty * 100).toFixed(0);
+    html += '<div class="ob-row ob-ask">' +
+      '<div class="ob-bar ob-bar-ask" style="width:' + pct + '%"></div>' +
+      '<span class="ob-price ob-ask-price">' + o.price.toFixed(2) + '</span>' +
+      '<span class="ob-qty">' + (o.quantity >= 10000 ? (o.quantity/10000).toFixed(1)+'万' : o.quantity) + '</span>' +
+      '</div>';
+  });
+
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function startCountdownTimer() {
@@ -504,7 +543,7 @@ function showAllocAdjustModal() {
 
 async function saveAllocation() {
   try {
-    var result = await apiPost('/api/company/alloc', pendingAlloc);
+    var result = await apiPost('/api/company/alloc', { alloc_pcts: pendingAlloc });
     showToast('分配比例已保存！', 'success');
     hideDecisionModal();
     loadCompanyInfo();
@@ -867,60 +906,6 @@ function escapeHtml(text) {
 // ============================================================
 // 行业概览
 // ============================================================
-async function loadIndustryData() {
-  try {
-    var data = await apiGet('/api/market/industry');
-    renderIndustry(data || []);
-  } catch (e) {
-    console.error('loadIndustry error', e);
-  }
-}
-
-function renderIndustry(data) {
-  var el = document.getElementById('industry-content');
-  if (!el) return;
-  if (!data || data.length === 0) {
-    el.innerHTML = '<div class="industry-empty">暂无行业数据</div>';
-    return;
-  }
-  el.innerHTML = '';
-  data.forEach(function(ind) {
-    var cycleClass = 'cycle-' + (ind.cycle || 'normal');
-    var cycName = ind.cycle_name || ind.cycle || '正常';
-    var cycDesc = ind.cycle_desc || '';
-    var card = document.createElement('div');
-    card.className = 'industry-card';
-    card.innerHTML =
-      '<div class="industry-card-header">' +
-        '<div>' +
-          '<span class="industry-name">' + (ind.industry_name || '--') + '</span>' +
-          '<span class="industry-desc-text">' + (ind.industry_desc || '') + '</span>' +
-        '</div>' +
-        '<span class="industry-cycle-badge ' + cycleClass + '">' + cycName + '</span>' +
-      '</div>' +
-      '<div class="industry-companies"></div>';
-    var companiesDiv = card.querySelector('.industry-companies');
-    (ind.companies || []).forEach(function(c) {
-      var priceClass = c.price >= 0 ? 'price-up' : 'price-down';
-      var row = document.createElement('div');
-      row.className = 'industry-company-row';
-      row.innerHTML =
-        '<span class="ic-symbol">' + c.symbol + '</span>' +
-        '<span class="ic-name">' + (c.name || '--') + '</span>' +
-        '<span class="ic-price ' + priceClass + '">' + Number(c.price).toFixed(2) + '</span>' +
-        '<span class="ic-pe">PE: ' + (c.pe || '--') + '</span>';
-      row.addEventListener('click', function() {
-        selectStock(c.symbol);
-        switchRightTab('leaderboard');
-      });
-      companiesDiv.appendChild(row);
-    });
-    el.appendChild(card);
-  });
-}
-
-
-// ============================================================
 // 公司经营相关
 // ============================================================
 let selectedIndustry = 'tech';
@@ -1013,6 +998,7 @@ function renderCompanyInfo(d) {
   document.getElementById('comp-profit').textContent = d.profit ? formatAmountCN(d.profit) : '--';
   document.getElementById('comp-employees').textContent = d.employees ? Number(d.employees).toLocaleString() : '--';
   document.getElementById('comp-quarter').textContent = d.quarter != null ? '第' + d.quarter + '季度' : '--';
+  document.getElementById('comp-tech-points').textContent = d.tech_points ? Number(d.tech_points).toFixed(1) : '0';
   // Show allocation percentages
   var alloc = d.alloc_pcts || {};
   document.getElementById('comp-alloc-reserve').textContent = (alloc.reserve != null ? alloc.reserve : 25) + '%';
@@ -1358,6 +1344,7 @@ function showCashActionModal() {
     {type: 'stock_buyback', icon: '🔄', name: '股票回购', min_cost: 50000, desc: '从市场回购股票，提振股价', effect: '直接提升公司估值'},
     {type: 'special_dividend', icon: '💰', name: '特别分红', min_cost: 20000, desc: '向所有股东派发现金分红', effect: '股东按持股比例获得现金'},
     {type: 'hiring', icon: '👥', name: '扩产招人', min_cost: 10000, desc: '招聘新员工提升产能', effect: '永久提升每季度营收'},
+    {type: 'layoff', icon: '🚪', name: '裁员', min_cost: 0, desc: '裁减员工降低成本', effect: '减少工资支出，但降低产能'},
     {type: 'marketing', icon: '📢', name: '市场突袭', min_cost: 30000, desc: '大规模营销推广', effect: '下季度营收大幅增长'},
     {type: 'media_pr', icon: '📰', name: '媒体公关', min_cost: 50000, desc: '提升公司品牌形象', effect: '短期拉高PE估值倍数'},
     {type: 'acquisition', icon: '🤝', name: '跨业并购', min_cost: 200000, desc: '收购小型企业', effect: '直接增加总资产和员工'},
@@ -1598,6 +1585,32 @@ function selectCashAction(type, name, minCost) {
     selectedActionName = name;
     selectedMinCost = 500000;
     window._pivotTarget = null;
+  } else if (type === 'layoff') {
+    var _company = gameState.myCompany || {};
+    var _emp = _company.employees || 0;
+    detail.innerHTML = '<div class="cash-detail-box">' +
+      '<div class="cash-detail-title">🚪 ' + name + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">当前员工: <b style="color:#ef4444;">' + _emp + '</b> 人</div>' +
+      '<div class="cash-input-group">' +
+      '<label>裁减人数</label>' +
+      '<input type="number" id="layoff-qty-input" class="cash-input" min="1" max="' + Math.max(0, _emp - 1) + '" value="' + Math.min(5, Math.max(1, Math.floor(_emp / 2))) + '">' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">每裁1人节省 ¥<span id="layoff-saving">0</span>/季度</div>' +
+      '<button class="btn btn-primary" onclick="executeCashAction()" style="margin-top:12px;width:100%;background:#ef4444;">确认裁员</button>' +
+      '</div>';
+    selectedActionType = 'layoff';
+    selectedActionName = name;
+    selectedMinCost = 0;
+    setTimeout(function() {
+      var _inp = document.getElementById('layoff-qty-input');
+      if (_inp) {
+        _inp.addEventListener('input', function() {
+          var _q = parseInt(this.value) || 0;
+          document.getElementById('layoff-saving').textContent = (_q * 800).toLocaleString();
+        });
+        _inp.dispatchEvent(new Event('input'));
+      }
+    }, 50);
   } else {
     detail.innerHTML = '<div class="cash-detail-box">' +
       '<div class="cash-detail-title">' + name + '</div>' +
@@ -1625,7 +1638,10 @@ function selectPivotTarget(ind) {
 async function executeCashAction() {
   if (!selectedActionType) return;
   var amount = selectedMinCost;
-  if (selectedActionType !== 'pivot') {
+  if (selectedActionType === 'layoff') {
+    var layoffInput = document.getElementById('layoff-qty-input');
+    if (layoffInput) amount = parseInt(layoffInput.value) || 1;
+  } else if (selectedActionType !== 'pivot') {
     var input = document.getElementById('cash-amount-input');
     if (input) amount = parseInt(input.value) || selectedMinCost;
     if (amount < selectedMinCost) {

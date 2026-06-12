@@ -63,6 +63,7 @@ class CompanyResponse(BaseModel):
     employees: int
     quarter: int
     alloc_pcts: dict
+    tech_points: float = 0.0
     share_price: float
     shares_outstanding: int
     valuation: float = 0.0

@@ -143,13 +143,13 @@
         </div>
       </div>
 
-      <!-- Right: Order Book + Tape + Tabbed -->
+      <!-- Right: Order Book + Tabbed -->
       <div class="panel-right">
-        <!-- Trade Tape -->
-        <div class="panel panel-tapetape">
-          <div class="panel-header">成交明细</div>
-          <div class="tape-content" id="tape-content">
-            <div class="tape-empty">暂无成交</div>
+        <!-- Order Book -->
+        <div class="panel panel-orderbook">
+          <div class="panel-header">盘口行情 <span id="ob-symbol" style="font-weight:400;color:var(--text-muted);"></span></div>
+          <div class="ob-content" id="orderbook-content">
+            <div class="ob-empty">暂无挂单</div>
           </div>
         </div>
 
@@ -157,15 +157,9 @@
         <div class="panel panel-tabbed">
           <div class="panel-tabs">
             <button class="tab-btn active" data-tab="leaderboard" onclick="switchRightTab('leaderboard')">排行榜</button>
-            <button class="tab-btn" data-tab="industry" onclick="switchRightTab('industry')">行业</button>
           </div>
           <div class="tab-panel active" id="tab-leaderboard">
             <div class="leaderboard" id="leaderboard"></div>
-          </div>
-                    <div class="tab-panel" id="tab-industry">
-            <div class="industry-content" id="industry-content">
-              <div class="industry-empty">暂无行业数据</div>
-            </div>
           </div>
         </div>
       </div>
@@ -514,6 +508,10 @@
           <div class="comp-stat-row">
             <span class="comp-stat-label">季度</span>
             <span class="comp-stat-value" id="comp-quarter">--</span>
+          </div>
+          <div class="comp-stat-row">
+            <span class="comp-stat-label">科技点</span>
+            <span class="comp-stat-value" id="comp-tech-points" style="color:#8b5cf6;">0</span>
           </div>
           <div class="comp-stat-row alloc-row-comp">
             <span class="comp-stat-label">储存</span>

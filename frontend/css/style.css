@@ -910,6 +910,60 @@ input, select, button, textarea { font-family: inherit; font-size: inherit; }
 .tape-row.active-sell .tape-arrow { color: var(--sell-color); }
 .tape-row.active-sell .tape-price { color: var(--sell-color); }
 
+/* Order Book */
+.panel-orderbook { min-height: 180px; }
+.ob-content { padding: 4px 8px; font-size: 12px; overflow-y: auto; max-height: 260px; }
+.ob-empty { text-align: center; padding: 24px; color: var(--text-muted); font-size: 12px; }
+.ob-grid { display: flex; flex-direction: column; gap: 1px; }
+.ob-header {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px;
+  gap: 4px;
+  padding: 4px 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  text-align: right;
+}
+.ob-header span:first-child { text-align: left; }
+.ob-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 70px;
+  gap: 4px;
+  padding: 3px 4px;
+  position: relative;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ob-row span { position: relative; z-index: 1; }
+.ob-row span:first-child { text-align: left; }
+.ob-bar {
+  position: absolute;
+  top: 0; bottom: 0;
+  right: 0;
+  z-index: 0;
+  border-radius: 2px;
+  opacity: 0.2;
+}
+.ob-bar-bid { background: var(--buy-color); }
+.ob-bar-ask { background: var(--sell-color); }
+.ob-bid-price { color: var(--buy-color); font-weight: 600; }
+.ob-ask-price { color: var(--sell-color); font-weight: 600; }
+.ob-spread {
+  display: grid;
+  grid-template-columns: 1fr 70px;
+  gap: 4px;
+  padding: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  text-align: right;
+  background: rgba(255,255,255,0.02);
+}
+.ob-spread span:first-child { text-align: left; }
+.ob-qty { color: var(--text-secondary); }
+
 /* ============================================================
    News Feed (公司公告)
    ============================================================ */
