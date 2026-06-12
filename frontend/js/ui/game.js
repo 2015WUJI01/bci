@@ -134,7 +134,7 @@ function selectStock(symbol) {
     b.classList.toggle('active', b.dataset.symbol === symbol);
   });
   renderStockInfo();
-  renderOrderBook();
+  renderTradeTape();
   var sel = document.getElementById("trade-stock-select");
   if (sel) sel.value = gameState.selectedStock || '';
   var adminSel = document.getElementById("admin-stock-select");
@@ -401,14 +401,38 @@ function renderOrderBook() {
   el.innerHTML = html;
 }
 
+function renderTradeTape() {
+  var el = document.getElementById('tape-content');
+  if (!el) return;
+  var tape = gameState.tape || [];
+  if (tape.length === 0) {
+    el.innerHTML = '<div class="tape-empty">暂无成交</div>';
+    return;
+  }
+  el.innerHTML = tape.map(function(t) {
+    var arrow = t.type === 'buy' ? '↑' : '↓';
+    var cls = t.type === 'buy' ? 'active-buy' : 'active-sell';
+    return '<div class="tape-row ' + cls + '">' +
+      '<span class="tape-time">' + (t.time || '--') + '</span>' +
+      '<span class="tape-arrow">' + arrow + '</span>' +
+      '<span class="tape-price">' + t.price.toFixed(2) + '</span>' +
+      '<span class="tape-qty">' + t.quantity + '</span>' +
+      '</div>';
+  }).join('');
+}
+
 function startCountdownTimer() {
   var el = document.getElementById('tick-countdown');
   if (!el) return;
+  var QUARTER_SEC = 300; // 200 ticks x 1.5s
   setInterval(function() {
-    var elapsed = (Date.now() / 1000) % 1.5;
-    var remaining = Math.max(0, 1.5 - elapsed);
-    el.textContent = '⏱ ' + remaining.toFixed(1) + 's';
-  }, 100);
+    var now = Date.now() / 1000;
+    var elapsed = now % QUARTER_SEC;
+    var remaining = Math.max(0, QUARTER_SEC - elapsed);
+    var min = Math.floor(remaining / 60);
+    var sec = Math.floor(remaining % 60);
+    el.textContent = '⏱ ' + min + ':' + (sec < 10 ? '0' : '') + sec;
+  }, 200);
 }
 
 function renderNews() {
@@ -1463,7 +1487,7 @@ async function loadQuarterlyHistory() {
 
         // Row 4: Per-share metrics
         '<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;padding:4px 0;border-top:1px solid #253545;">' +
-        '<span style="color:#8899a6;">EPS</span><span style="color:#c0d0d8;">' + (r.eps || 0).toFixed(4) + '</span>' +
+        '<span style="color:#8899a6;">EPS</span><span style="color:#c0d0d8;">' + (r.eps || 0).toFixed(2) + '</span>' +
         '<span style="color:#8899a6;">NAV</span><span style="color:#c0d0d8;">' + (r.nav || 0).toFixed(2) + '</span>' +
         '<span style="color:#8899a6;">PE</span><span style="color:#c0d0d8;">' + (r.pe || '--') + '</span>' +
         '<span style="color:#8899a6;">PB</span><span style="color:#c0d0d8;">' + (r.pb || '--') + '</span>' +

@@ -81,6 +81,9 @@ function handleWsMessage(msg) {
       // Capture trade tape
       if (msg.data.tape) {
         gameState.tape = msg.data.tape;
+        if (typeof renderTradeTape === 'function') {
+          renderTradeTape();
+        }
       }
       break;
 
@@ -94,7 +97,7 @@ function handleWsMessage(msg) {
           ? document.getElementById('short-msg')
           : document.getElementById('trade-msg');
         msgEl.innerHTML =
-          `${action} ${t.quantity} 股 DM，成交价 ¥${t.price.toFixed(4)}<br><span style="font-size:11px;color:var(--text-muted);">手续费 ¥${t.total_fee.toFixed(2)} ${feeText}</span>`;
+          `${action} ${t.quantity} 股，成交价 ¥${t.price.toFixed(2)}<br><span style="font-size:11px;color:var(--text-muted);">手续费 ¥${t.total_fee.toFixed(2)} ${feeText}</span>`;
         msgEl.className = 'trade-msg success';
       }
       break;
@@ -112,15 +115,8 @@ function handleWsMessage(msg) {
       updatePortfolio(msg.data);
       break;
 
-    case 'orderbook':
-      gameState.orderBook = msg.data || {};
-      if (typeof renderOrderBook === 'function') {
-        renderOrderBook();
-      }
-      break;
-
     case 'order_placed':
-      showToast(`限价单已提交: DM ${msg.data.order_type === 'buy' ? '买入' : '卖出'} ${msg.data.quantity}股 @ ¥${msg.data.price.toFixed(4)}`, 'success');
+      showToast(`限价单已提交: DM ${msg.data.order_type === 'buy' ? '买入' : '卖出'} ${msg.data.quantity}股 @ ¥${msg.data.price.toFixed(2)}`, 'success');
       setTimeout(loadMyOrders, 500);
       break;
 
@@ -160,6 +156,11 @@ function handleWsMessage(msg) {
       break;
 
     case 'pong':
+      if (msg.data && msg.data.t) {
+        var lat = Date.now() - msg.data.t;
+        var el = document.getElementById('ws-latency');
+        if (el) el.textContent = lat + 'ms';
+      }
       break;
 
     default:
@@ -168,18 +169,19 @@ function handleWsMessage(msg) {
 }
 
 function renderStockInfo() {
-  const s = gameState.stocks[0];
+  var sym = gameState.selectedStock || (gameState.stocks.length > 0 ? gameState.stocks[0].symbol : "");
+  const s = gameState.stocks.find(function(stk) { return stk.symbol === sym; }) || gameState.stocks[0];
   if (!s) return;
-  document.getElementById('stock-price-header').textContent = '¥' + s.price.toFixed(4);
-  document.getElementById('stock-price-big').textContent = '¥' + s.price.toFixed(4);
-  document.getElementById('stock-change').textContent = (s.change >= 0 ? '+' : '') + s.change.toFixed(4);
+  document.getElementById('stock-price-header').textContent = '¥' + s.price.toFixed(2);
+  document.getElementById('stock-price-big').textContent = '¥' + s.price.toFixed(2);
+  document.getElementById('stock-change').textContent = (s.change >= 0 ? '+' : '') + s.change.toFixed(2);
   document.getElementById('stock-change-pct').textContent = formatPercent(s.change_pct);
 
   const ds = gameState.dailyStats || {};
-  document.getElementById('stock-open').textContent = ds.open != null ? ds.open.toFixed(4) : '--';
-  document.getElementById('stock-prev-close').textContent = ds.prev_close != null ? ds.prev_close.toFixed(4) : '--';
-  document.getElementById('stock-high').textContent = ds.high != null ? ds.high.toFixed(4) : '--';
-  document.getElementById('stock-low').textContent = ds.low != null ? ds.low.toFixed(4) : '--';
+  document.getElementById('stock-open').textContent = ds.open != null ? ds.open.toFixed(2) : '--';
+  document.getElementById('stock-prev-close').textContent = ds.prev_close != null ? ds.prev_close.toFixed(2) : '--';
+  document.getElementById('stock-high').textContent = ds.high != null ? ds.high.toFixed(2) : '--';
+  document.getElementById('stock-low').textContent = ds.low != null ? ds.low.toFixed(2) : '--';
   document.getElementById('stock-volume').textContent = s.volume >= 10000 ? (s.volume/10000).toFixed(1) + '万' : s.volume;
 
   // 新指标

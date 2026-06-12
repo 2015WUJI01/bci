@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 
 GLOBAL_ROOM_ID = "__market__"
 
+def _any_stock_sym(state):
+    """Get any available stock symbol for AI bots to trade."""
+    for sym in state.stocks:
+        return sym
+    return None
+
 # Track players whose state needs saving to DB
 _dirty_players: set[str] = set()
 
@@ -459,7 +465,7 @@ async def init_global_market():
             for c in rows.scalars().all():
                 if c.symbol not in state.stocks:
                     nav = round(c.total_assets / c.shares_outstanding, 2) if c.shares_outstanding > 0 else 1.0
-                    eps = round(c.profit / c.shares_outstanding, 4) if c.shares_outstanding > 0 else 0
+                    eps = round(c.profit / c.shares_outstanding, 2) if c.shares_outstanding > 0 else 0
                     state.stocks[c.symbol] = {
                         "symbol": c.symbol,
                         "name": c.name,
@@ -560,7 +566,7 @@ async def price_tick_loop():
                 state._vwap_vol = sd["volume"]
             else:
                 vol_delta = 0
-            avg_p = round(state._vwap_value / state._vwap_vol, 4) if state._vwap_vol > 0 else sd["price"]
+            avg_p = round(state._vwap_value / state._vwap_vol, 2) if state._vwap_vol > 0 else sd["price"]
 
             state.timeshare.append({
                 "time": now_ms,
@@ -641,7 +647,7 @@ async def price_tick_loop():
             if total_delta > 2000:  # 至少 2000 股成交才计算漂移
                 imbalance = (buy_delta - sell_delta) / total_delta  # -1 ~ 1
                 drift = imbalance * 0.0005  # 最大 ±0.05%/tick
-                sd_v["price"] = round(max(PRICE_MIN, min(PRICE_MAX, sd_v["price"] * (1 + drift))), 4)
+                sd_v["price"] = round(max(PRICE_MIN, min(PRICE_MAX, sd_v["price"] * (1 + drift))), 2)
 
         # --- Finalize candles ---
         # 1-tick candles always finalize
@@ -720,8 +726,8 @@ async def price_tick_loop():
         # --- EPS/NAV 动态漂移 every 60 ticks ---
         if tick_count % 60 == 0:
             for sym_eps, sd_eps in state.stocks.items():
-                sd_eps["eps"] = round(sd_eps["eps"] * random.uniform(0.98, 1.02), 4)
-                sd_eps["nav"] = round(sd_eps["nav"] * random.uniform(0.99, 1.01), 4)
+                sd_eps["eps"] = round(sd_eps["eps"] * random.uniform(0.98, 1.02), 2)
+                sd_eps["nav"] = round(sd_eps["nav"] * random.uniform(0.99, 1.01), 2)
 
         # --- 财务报告 every 2400 ticks (1 in-game month) ---
         MONTH_TICKS = 2400
@@ -1071,8 +1077,10 @@ async def _ai_buy_tick(state):
     if not player:
         return
     player_holdings = state.holdings.setdefault(pid, {})
-    holding = player_holdings.setdefault("DM", {"qty": 0, "avg_cost": 0.0, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0})
-    stock = state.stocks.get("DM")
+    sym = _any_stock_sym(state)
+    if not sym: return
+    holding = player_holdings.setdefault(sym, {"qty": 0, "avg_cost": 0.0, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0})
+    stock = state.stocks.get(sym)
     if not stock:
         return
     price = stock["price"]
@@ -1083,11 +1091,11 @@ async def _ai_buy_tick(state):
 
     # Place 5-tier buy limit orders below market (thinner book for more volatility)
     tiers = [
-        (round(price * 0.995, 4), 3000),   # -0.5%
-        (round(price * 0.985, 4), 10000),  # -1.5%
-        (round(price * 0.97, 4), 20000),   # -3%
-        (round(price * 0.94, 4), 35000),   # -6%
-        (round(price * 0.88, 4), 60000),   # -12%
+        (round(price * 0.995, 2), 3000),   # -0.5%
+        (round(price * 0.985, 2), 10000),  # -1.5%
+        (round(price * 0.97, 2), 20000),   # -3%
+        (round(price * 0.94, 2), 35000),   # -6%
+        (round(price * 0.88, 2), 60000),   # -12%
     ]
     for limit_price, qty in tiers:
         if limit_price <= 0:
@@ -1131,7 +1139,7 @@ async def _ai_buy_tick(state):
         if sell_qty > 0:
             await place_limit_order(pid, {
                 "stock_symbol": "DM", "quantity": sell_qty,
-                "order_type": "sell", "price": round(price * 1.01, 4),
+                "order_type": "sell", "price": round(price * 1.01, 2),
             })
 
 
@@ -1142,8 +1150,10 @@ async def _ai_sell_tick(state):
     if not player:
         return
     player_holdings = state.holdings.setdefault(pid, {})
-    holding = player_holdings.setdefault("DM", {"qty": 0, "avg_cost": 0.0, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0})
-    stock = state.stocks.get("DM")
+    sym = _any_stock_sym(state)
+    if not sym: return
+    holding = player_holdings.setdefault(sym, {"qty": 0, "avg_cost": 0.0, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0})
+    stock = state.stocks.get(sym)
     if not stock:
         return
     price = stock["price"]
@@ -1163,11 +1173,11 @@ async def _ai_sell_tick(state):
 
     # Place 5-tier sell limit orders above market (thinner book for more volatility)
     tiers = [
-        (round(price * 1.005, 4), 3000),   # +0.5%
-        (round(price * 1.015, 4), 10000),  # +1.5%
-        (round(price * 1.03, 4), 20000),   # +3%
-        (round(price * 1.06, 4), 35000),   # +6%
-        (round(price * 1.12, 4), 60000),   # +12%
+        (round(price * 1.005, 2), 3000),   # +0.5%
+        (round(price * 1.015, 2), 10000),  # +1.5%
+        (round(price * 1.03, 2), 20000),   # +3%
+        (round(price * 1.06, 2), 35000),   # +6%
+        (round(price * 1.12, 2), 60000),   # +12%
     ]
     for limit_price, qty in tiers:
         if limit_price <= 0:
@@ -1395,9 +1405,10 @@ def _compute_signal(strategy: str, price: float, history: list[float],
 
 async def _npc_make_decision(pid: str, npc: dict, state):
     """执行单个 NPC 的交易决策。"""
-    stock = state.stocks.get("DM")
-    if not stock:
-        return
+    sym = _any_stock_sym(state)
+    if not sym: return
+    stock = state.stocks.get(sym)
+    if not stock: return
     price = stock["price"]
     player = state.players.get(pid)
     if not player:
@@ -1442,7 +1453,7 @@ async def _npc_make_decision(pid: str, npc: dict, state):
             return  # 数量不足100股，不交易
         # 65% 概率用限价单，35% 用市价单（更多市价单增加波动）
         if random.random() < 0.65:
-            limit_price = round(price * random.uniform(0.97, 0.995), 4)
+            limit_price = round(price * random.uniform(0.97, 0.995), 2)
             if limit_price > 0:
                 await place_limit_order(pid, {
                     "stock_symbol": "DM", "quantity": qty,
@@ -1468,7 +1479,7 @@ async def _npc_make_decision(pid: str, npc: dict, state):
             return
         # 65% 概率用限价单
         if random.random() < 0.65:
-            limit_price = round(price * random.uniform(1.005, 1.03), 4)
+            limit_price = round(price * random.uniform(1.005, 1.03), 2)
             await place_limit_order(pid, {
                 "stock_symbol": "DM", "quantity": qty,
                 "order_type": "sell", "price": limit_price,
@@ -1509,14 +1520,15 @@ async def npc_trading_loop():
 
 
 async def _retail_make_decision(pid: str, rd: dict, state):
-    stock = state.stocks.get("DM")
-    if not stock:
-        return
+    sym = _any_stock_sym(state)
+    if not sym: return
+    stock = state.stocks.get(sym)
+    if not stock: return
     price = stock["price"]
     player = state.players.get(pid)
     if not player:
         return
-    holding = state.holdings.setdefault(pid, {}).setdefault("DM", {"qty": 0, "avg_cost": 0.0, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0})
+    holding = state.holdings.setdefault(pid, {}).setdefault(sym, {"qty": 0, "avg_cost": 0.0, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0})
     available_cash = player["cash"] - player.get("frozen_cash", 0)
     available_qty = holding["qty"] - holding.get("frozen_qty", 0)
 
@@ -1608,9 +1620,10 @@ async def quant_trading_loop():
 
 async def _quant_make_decision(pid: str, qd: dict, state):
     """量化基金交易决策 — 大额多空双向交易制造价格波动。"""
-    stock = state.stocks.get("DM")
-    if not stock:
-        return
+    sym = _any_stock_sym(state)
+    if not sym: return
+    stock = state.stocks.get(sym)
+    if not stock: return
     price = stock["price"]
     player = state.players.get(pid)
     if not player:
@@ -1660,11 +1673,11 @@ async def _quant_make_decision(pid: str, qd: dict, state):
                     int(max_qty * 0.20),  # -5%
                 ]
                 tier_prices = [
-                    round(price * 0.995, 4),
-                    round(price * 0.99, 4),
-                    round(price * 0.98, 4),
-                    round(price * 0.97, 4),
-                    round(price * 0.95, 4),
+                    round(price * 0.995, 2),
+                    round(price * 0.99, 2),
+                    round(price * 0.98, 2),
+                    round(price * 0.97, 2),
+                    round(price * 0.95, 2),
                 ]
                 for tqty, tprice in zip(tier_qtys, tier_prices):
                     if tqty < 2000 or tprice <= 0:
@@ -1689,11 +1702,11 @@ async def _quant_make_decision(pid: str, qd: dict, state):
                     int(max_sell * 0.15),
                 ]
                 tier_sell_prices = [
-                    round(price * 1.005, 4),
-                    round(price * 1.01, 4),
-                    round(price * 1.02, 4),
-                    round(price * 1.03, 4),
-                    round(price * 1.05, 4),
+                    round(price * 1.005, 2),
+                    round(price * 1.01, 2),
+                    round(price * 1.02, 2),
+                    round(price * 1.03, 2),
+                    round(price * 1.05, 2),
                 ]
                 for tqty, tprice in zip(tier_sell_qty, tier_sell_prices):
                     if tqty < 2000:
@@ -1727,9 +1740,9 @@ async def _quant_make_decision(pid: str, qd: dict, state):
         if base_qty >= 2000:
             # 分 3 档挂限价单，分布在 -0.3% ~ -1.5%
             tiers = [
-                (round(price * 0.997, 4), int(base_qty * 0.3)),
-                (round(price * 0.992, 4), int(base_qty * 0.3)),
-                (round(price * 0.985, 4), int(base_qty * 0.4)),
+                (round(price * 0.997, 2), int(base_qty * 0.3)),
+                (round(price * 0.992, 2), int(base_qty * 0.3)),
+                (round(price * 0.985, 2), int(base_qty * 0.4)),
             ]
             for limit_price, tqty in tiers:
                 if limit_price <= 0 or tqty < 500:
@@ -1747,9 +1760,9 @@ async def _quant_make_decision(pid: str, qd: dict, state):
             base_qty = max(base_qty, 2000)
             if base_qty >= 2000:
                 tiers = [
-                    (round(price * 1.003, 4), int(base_qty * 0.3)),
-                    (round(price * 1.008, 4), int(base_qty * 0.3)),
-                    (round(price * 1.015, 4), int(base_qty * 0.4)),
+                    (round(price * 1.003, 2), int(base_qty * 0.3)),
+                    (round(price * 1.008, 2), int(base_qty * 0.3)),
+                    (round(price * 1.015, 2), int(base_qty * 0.4)),
                 ]
                 for limit_price, tqty in tiers:
                     if tqty < 500:
@@ -1865,7 +1878,7 @@ async def check_forced_liquidation():
             price = stock["price"]
             # 计算需要卖多少股才能凑够 need_repay
             # 卖出后净收入 ≈ price * qty * (1 - stamp_tax - commission_rate)
-            net_per_share = round(price * (1 - STAMP_TAX_RATE - COMMISSION_RATE), 4)
+            net_per_share = round(price * (1 - STAMP_TAX_RATE - COMMISSION_RATE), 2)
             if net_per_share <= 0:
                 continue
             sell_qty = min(available, int(need_repay / net_per_share) + 100)
@@ -1889,7 +1902,7 @@ async def check_forced_liquidation():
             # 市场影响
             stock["volume"] += sell_qty
             impact = round(price * (sell_qty / SHARES_OUTSTANDING) * 100, 6)
-            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, stock["price"] - impact)), 4)
+            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, stock["price"] - impact)), 2)
             # 记录成交明细
             state.trade_tape.insert(0, {
                 "time": datetime.utcnow().strftime("%H:%M:%S"),
@@ -2081,9 +2094,10 @@ async def sec_regulator_check():
 # 庄家操盘：4 阶段周期（吸筹->拉升->洗盘->出货）
 # ---------------------------------------------------------------------------
 async def _zhuangjia_make_decision(state):
-    stock = state.stocks.get("DM")
-    if not stock:
-        return
+    sym = _any_stock_sym(state)
+    if not sym: return
+    stock = state.stocks.get(sym)
+    if not stock: return
     price = stock["price"]
     player = state.players.get("zhuangjia")
     if not player:
@@ -2091,7 +2105,7 @@ async def _zhuangjia_make_decision(state):
     zd = state.zhuang_data
     if not zd:
         return
-    holding = state.holdings.setdefault("zhuangjia", {}).setdefault("DM", {"qty": 0, "avg_cost": 0.0, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0})
+    holding = state.holdings.setdefault("zhuangjia", {}).setdefault(sym, {"qty": 0, "avg_cost": 0.0, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0})
 
     # Crash mode: 无条件卖出
     if state.crash_mode:
@@ -2130,7 +2144,7 @@ async def _zhuangjia_make_decision(state):
     phase = zd["phase"]
     if phase == "accumulate":
         if available_cash > 500000 and holding["qty"] < zd["position_limit"]:
-            limit_price = round(price * random.uniform(0.95, 0.99), 4)
+            limit_price = round(price * random.uniform(0.95, 0.99), 2)
             qty = min(int(available_cash * 0.08 / price), 80000)
             if qty >= 5000:
                 await place_limit_order("zhuangjia", {
@@ -2155,7 +2169,7 @@ async def _zhuangjia_make_decision(state):
                 })
     elif phase == "distribute":
         if available_qty > 50000:
-            limit_price = round(price * random.uniform(1.0, 1.05), 4)
+            limit_price = round(price * random.uniform(1.0, 1.05), 2)
             qty = min(int(available_qty * 0.15), 150000)
             if qty >= 5000:
                 await place_limit_order("zhuangjia", {
@@ -2266,7 +2280,7 @@ async def _sweep_sell_orders(state, buyer_id: str, symbol: str, qty: int, max_ca
     if filled == 0:
         return None
 
-    avg_price = round(total_cost / filled, 4) if filled > 0 else 0
+    avg_price = round(total_cost / filled, 2) if filled > 0 else 0
     total_commission = round(sum(f["commission"] for f in fills), 2)
 
     return {
@@ -2350,7 +2364,7 @@ async def _sweep_buy_orders(state, seller_id: str, symbol: str, qty: int) -> dic
     if filled == 0:
         return None
 
-    avg_price = round(total_proceeds / filled, 4) if filled > 0 else 0
+    avg_price = round(total_proceeds / filled, 2) if filled > 0 else 0
     commission = round(max(total_proceeds * COMMISSION_RATE, MIN_COMMISSION), 2)
     stamp_tax = round(total_proceeds * STAMP_TAX_RATE, 2)
 
@@ -2696,10 +2710,10 @@ async def execute_trade(player_id: str, data: dict):
         eps_impact = random.uniform(-0.005, 0.01)
         nav_impact = random.uniform(-0.008, 0.005)
         if trade_type in ("buy", "cover"):
-            stock["eps"] = round(stock["eps"] * (1 + eps_impact), 4)
+            stock["eps"] = round(stock["eps"] * (1 + eps_impact), 2)
         else:
-            stock["eps"] = round(stock["eps"] * (1 - eps_impact * 0.5), 4)
-        stock["nav"] = round(stock["nav"] * (1 + nav_impact), 4)
+            stock["eps"] = round(stock["eps"] * (1 - eps_impact * 0.5), 2)
+        stock["nav"] = round(stock["nav"] * (1 + nav_impact), 2)
 
     # Send trade_executed to player
     await manager.send_to(GLOBAL_ROOM_ID, player_id, {
@@ -2833,7 +2847,7 @@ async def _execute_limit_order(order: dict, quantity: int, price: float):
             player["frozen_cash"] = max(0, player.get("frozen_cash", 0) - unfreeze)
             player["cash"] = round(player["cash"] - fill_total_cost - fill_commission, 2)
             mark_dirty(player_id)
-            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, result["last_price"])), 4)
+            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, result["last_price"])), 2)
         else:
             if available_cash <= 0:
                 return
@@ -2851,7 +2865,7 @@ async def _execute_limit_order(order: dict, quantity: int, price: float):
             player["cash"] = round(player["cash"] - total_cost - commission, 2)
             mark_dirty(player_id)
             impact = round(price * (qty_to_execute / SHARES_OUTSTANDING) * 50, 6)
-            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, stock["price"] + impact)), 4)
+            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, stock["price"] + impact)), 2)
             order["filled"] += qty_to_execute
             if order["filled"] >= order["quantity"]:
                 order["status"] = "filled"
@@ -2891,7 +2905,7 @@ async def _execute_limit_order(order: dict, quantity: int, price: float):
             if holding["qty"] == 0:
                 holding["avg_cost"] = 0.0
             mark_dirty(player_id)
-            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, result["last_price"])), 4)
+            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, result["last_price"])), 2)
             commission = fill_commission
             stamp_tax = fill_stamp
             fill_fee = fill_fee
@@ -2914,7 +2928,7 @@ async def _execute_limit_order(order: dict, quantity: int, price: float):
                 holding["avg_cost"] = 0.0
             mark_dirty(player_id)
             impact = round(price * (qty_to_execute / SHARES_OUTSTANDING) * 50, 6)
-            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, stock["price"] - impact)), 4)
+            stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, stock["price"] - impact)), 2)
             order["filled"] += qty_to_execute
             if order["filled"] >= order["quantity"]:
                 order["status"] = "filled"
@@ -3289,27 +3303,11 @@ async def _update_company_stock_prices(state):
                 if not c:
                     continue
 
-                # Calculate fundamental price: NAV x industry PE x cycle multiplier
+                # No per-tick drift — price only changes through actual trades
+                # Fundamental value calculated for display/reference at quarterly reset
                 nav = max(c.total_assets / max(c.shares_outstanding, 1), 1.0)
-                base_pe = {"tech": 20, "finance": 12, "manufacturing": 10,
-                           "energy": 8, "consumer": 15, "healthcare": 18}.get(c.industry, 10)
-                cycle_info = state.industry_cycles.get(c.industry, {})
-                cycle = cycle_info.get("cycle", "normal")
-                cycle_mult = {"boom": 1.5, "normal": 1.0, "recession": 0.6}.get(cycle, 1.0)
-                # Add profit contribution
-                eps = c.profit / max(c.shares_outstanding, 1) if c.quarter > 0 else 0
-                fundamental = nav * base_pe * cycle_mult + eps * 5
-
-                # Drift current price toward fundamental (0.5% per tick)
-                current = sd["price"]
-                diff = fundamental - current
-                drift = diff * 0.005
-                # Clamp drift to +-2% per tick
-                drift = max(-current * 0.02, min(current * 0.02, drift))
-                new_price = max(0.01, current + drift)
-                sd["price"] = round(new_price, 4)
                 sd["nav"] = round(nav, 2)
-                sd["eps"] = round(eps, 4)
+                sd["eps"] = round(eps, 2)
     except Exception as e:
         logger.error(f"Company stock price update error: {e}")
 
@@ -3503,7 +3501,7 @@ async def _process_quarterly(state, tick_count):
                 # Update in-memory stock
                 if c.symbol in state.stocks:
                     state.stocks[c.symbol]["price"] = c.share_price
-                    state.stocks[c.symbol]["eps"] = round(eps, 4)
+                    state.stocks[c.symbol]["eps"] = round(eps, 2)
                     state.stocks[c.symbol]["nav"] = round(nav, 2)
 
             await session.commit()

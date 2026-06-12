@@ -69,7 +69,7 @@ function _startHeartbeat() {
   if (_hbInterval) clearInterval(_hbInterval);
   _hbInterval = setInterval(function() {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'ping' }));
+      ws.send(JSON.stringify({ type: 'ping', data: { t: Date.now() } }));
     }
   }, 30000);
 }

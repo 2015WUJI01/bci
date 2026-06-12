@@ -39,7 +39,10 @@ async def websocket_endpoint(websocket: WebSocket, player_id: str = Query("")):
             msg_data = data.get("data", {})
 
             if msg_type == "ping":
-                await manager.send_to(GLOBAL_ROOM_ID, player_id, {"type": "pong"})
+                ts = 0
+                if isinstance(msg_data, dict):
+                    ts = msg_data.get("t", 0)
+                await manager.send_to(GLOBAL_ROOM_ID, player_id, {"type": "pong", "data": {"t": ts}})
 
             elif msg_type == "join":
                 # Initialize player in global state

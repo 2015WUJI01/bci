@@ -443,7 +443,7 @@ function drawKline() {
     ctx.fillStyle = KLINE.TEXT_COLOR;
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(gPrice.toFixed(4), w - pad.right + 4, gy + 3);
+    ctx.fillText(gPrice.toFixed(2), w - pad.right + 4, gy + 3);
   }
 
   // ================================================================
@@ -505,7 +505,7 @@ function drawKline() {
   for (var lli = 0; lli < maPeriods.length; lli++) {
     var lastVals = maData[maPeriods[lli]].filter(function(v) { return v !== null; });
     var label = 'MA' + maPeriods[lli];
-    if (lastVals.length > 0) label += ' ' + lastVals[lastVals.length - 1].toFixed(4);
+    if (lastVals.length > 0) label += ' ' + lastVals[lastVals.length - 1].toFixed(2);
     ctx.fillStyle = maColors[lli];
     ctx.fillText(label, legX + lli * 60, legY);
   }
@@ -581,7 +581,7 @@ function drawKline() {
     ctx.fillStyle = last.close >= last.open ? KLINE.UP_COLOR : KLINE.DOWN_COLOR;
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(last.close.toFixed(4), w - pad.right, ly - 4);
+    ctx.fillText(last.close.toFixed(2), w - pad.right, ly - 4);
     ctx.strokeStyle = (last.close >= last.open ? KLINE.UP_COLOR : KLINE.DOWN_COLOR) + '40';
     ctx.lineWidth = 0.5;
     ctx.setLineDash([2, 3]);
@@ -630,19 +630,19 @@ function drawKline() {
     ctx.fillStyle = KLINE.CROSS_COLOR;
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('¥' + hoveredPrice.toFixed(4), w - pad.right + 4, hy - 2);
+    ctx.fillText('¥' + hoveredPrice.toFixed(2), w - pad.right + 4, hy - 2);
 
     // OHLC info box
     var ohlcIsUp = hoverCandle.close >= hoverCandle.open;
     var ohlcColor = ohlcIsUp ? KLINE.UP_COLOR : KLINE.DOWN_COLOR;
-    var ohlcText = 'O:' + hoverCandle.open.toFixed(4) + ' H:' + hoverCandle.high.toFixed(4)
-                 + ' L:' + hoverCandle.low.toFixed(4) + ' C:' + hoverCandle.close.toFixed(4);
+    var ohlcText = 'O:' + hoverCandle.open.toFixed(2) + ' H:' + hoverCandle.high.toFixed(2)
+                 + ' L:' + hoverCandle.low.toFixed(2) + ' C:' + hoverCandle.close.toFixed(2);
 
     // MA values
     var maText = '';
     for (var mai = 0; mai < maPeriods.length; mai++) {
       var mpv = maData[maPeriods[mai]][hoverIdx];
-      if (mpv !== null) maText += ' MA' + maPeriods[mai] + ':' + mpv.toFixed(4);
+      if (mpv !== null) maText += ' MA' + maPeriods[mai] + ':' + mpv.toFixed(2);
     }
     var fullText = ohlcText + maText;
 
@@ -1274,7 +1274,7 @@ function drawTimeshare() {
     ctx.fillStyle = '#5a7a8a';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(gPrice.toFixed(4), w - pad.right + 4, gy + 3);
+    ctx.fillText(gPrice.toFixed(2), w - pad.right + 4, gy + 3);
   }
 
   // Reference line
@@ -1365,7 +1365,7 @@ function drawTimeshare() {
   ctx.fillStyle = '#3b82f6';
   ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(lastDP.price.toFixed(4), llx, lly - 4);
+  ctx.fillText(lastDP.price.toFixed(2), llx, lly - 4);
 
   // Avg price legend
   var lastAP = data[data.length - 1].avg_price;
@@ -1373,6 +1373,6 @@ function drawTimeshare() {
     ctx.fillStyle = '#f5c842';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('均价 ￥' + lastAP.toFixed(4), pad.left + 4, pad.top + 14);
+    ctx.fillText('均价 ￥' + lastAP.toFixed(2), pad.left + 4, pad.top + 14);
   }
 }
