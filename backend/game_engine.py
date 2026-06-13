@@ -60,7 +60,7 @@ class GlobalMarketState:
         self.prev_close: float = 1.0
         self.last_reset_date: str = ""  # YYYY-MM-DD
         self.news_feed: list[dict] = []
-        self.timeshare: list[dict] = []  # time-share price points
+        self.timeshare: dict = {}  # time-share price points
         self.price_history: list[float] = []  # recent prices for trend detection
         self.last_news_time: float = 0  # timestamp of last news (real clock)
         self.asset_history: dict[str, list] = {}
@@ -568,7 +568,9 @@ async def price_tick_loop():
                 vol_delta = 0
             avg_p = round(state._vwap_value / state._vwap_vol, 2) if state._vwap_vol > 0 else sd["price"]
 
-            state.timeshare.append({
+            if not isinstance(state.timeshare, dict):
+                state.timeshare = {}
+            state.timeshare.setdefault(sym, []).append({
                 "time": now_ms,
                 "price": sd["price"],
                 "avg_price": avg_p,
@@ -1003,7 +1005,7 @@ async def price_tick_loop():
             "volume": first_stock.get("volume", 0),
         }
         if state.timeshare:
-            msg["data"]["timeshare"] = state.timeshare[-241:]  # last ~6 minutes
+            msg["data"]["timeshare"] = state.timeshare  # last ~6 minutes
         if state.trade_tape:
             msg["data"]["tape"] = state.trade_tape[:20]
 
@@ -1048,7 +1050,12 @@ async def ai_trading_loop():
                 await _ai_sell_tick(state)
             except Exception as e:
                 logger.error(f"AI sell error: {e}")
-        # AI market-making trades disabled — mmaker provides liquidity via execute_trade fallback
+        # AI market-making trades: show in tape, no price impact
+        if tick_count % 24 == 0:
+            try:
+                await _ai_market_tape_trade(state)
+            except Exception as e:
+                logger.error(f"AI tape trade error: {e}")
 
 
 async def _ai_clear_pending(player_id: str, order_type: str):
@@ -1225,6 +1232,25 @@ async def _ai_market_trade(state):
         else:
             await execute_trade("mmaker_sell", {"stock_symbol": sym, "quantity": qty, "trade_type": "sell"})
         break  # one trade per tick
+
+
+async def _ai_market_tape_trade(state):
+    """Market maker trade for tape visibility only — no price impact."""
+    for sym, sd in list(state.stocks.items()):
+        if not sd.get("is_company_stock"):
+            continue
+        price = sd.get("price", 1)
+        if price <= 0:
+            continue
+        qty = random.randint(1000, 5000)
+        # Record trade in tape without changing price or holdings
+        state.trade_tape.insert(0, {
+            "time": datetime.utcnow().strftime("%H:%M:%S"),
+            "price": price, "quantity": qty, "type": random.choice(["buy", "sell"]),
+        })
+        if len(state.trade_tape) > 100:
+            state.trade_tape = state.trade_tape[:100]
+        break
 
 
 # ============================================================

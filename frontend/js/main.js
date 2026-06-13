@@ -261,8 +261,9 @@ function switchKlinePeriod(period) {
 
   if (period === 'chart') {
     // Switch to time-share chart mode
-    if (gameState.timeshare && gameState.timeshare.length > 0) {
-      setTimeshareData(gameState.timeshare);
+    var _tsel = gameState.selectedStock || (gameState.stocks.length > 0 ? gameState.stocks[0].symbol : null);
+    if (gameState.timeshare && _tsel && gameState.timeshare[_tsel] && gameState.timeshare[_tsel].length > 0) {
+      setTimeshareData(gameState.timeshare[_tsel]);
     }
     toggleChartMode('timeshare');
   } else if (period === 'kline-1d' || period === 'kline-1w' || period === 'kline-1m') {
