@@ -909,6 +909,8 @@ async def price_tick_loop():
         stocks_data = []
         for sym, sd in state.stocks.items():
             ref_price = state.prev_close or sd.get("price", 1.0)
+            if sd.get("is_company_stock"):
+                ref_price = sd.get("price", 1.0)
             change = round(sd["price"] - ref_price, 2)
             change_pct = round((change / ref_price) * 100, 2) if ref_price else 0
             stocks_data.append({
@@ -1223,11 +1225,11 @@ async def _ai_market_trade(state):
         # Small random trade: 500-2000 shares
         qty = random.randint(500, 2000)
         price = sd["price"]
-        # ai_buy buys, ai_sell sells (or vice versa randomly)
+        # Market maker trades: mmaker_buy buys, mmaker_sell sells
         if random.random() < 0.5:
-            await execute_trade("ai_buy", {"stock_symbol": sym, "quantity": qty, "trade_type": "buy"})
+            await execute_trade("mmaker_buy", {"stock_symbol": sym, "quantity": qty, "trade_type": "buy"})
         else:
-            await execute_trade("ai_sell", {"stock_symbol": sym, "quantity": qty, "trade_type": "sell"})
+            await execute_trade("mmaker_sell", {"stock_symbol": sym, "quantity": qty, "trade_type": "sell"})
         break  # one trade per tick
 
 
@@ -2539,7 +2541,7 @@ async def execute_trade(player_id: str, data: dict):
         result = await _sweep_sell_orders(state, player_id, symbol, qty, available_cash * 2.0)
         if result is None:
             # 无挂单时从 ai_sell 库存按市价卖出（做市商）
-            ai_hold = state.holdings.get("ai_sell", {}).get(symbol, {})
+            ai_hold = state.holdings.get("mmaker_sell", {}).get(symbol, {})
             mm_qty = min(qty, ai_hold.get("qty", 0) - ai_hold.get("frozen_qty", 0))
             if mm_qty > 0:
                 mm_price = stock.get("price", 1)

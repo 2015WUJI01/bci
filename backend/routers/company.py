@@ -100,10 +100,10 @@ async def create_company(req: CompanyCreateRequest, user: User = Depends(_get_cu
     # Allocate shares: creator holds 40%, AI bots 30%, bots 30%
     creator_hold = state.holdings.setdefault(user.id, {})
     creator_hold[symbol] = {"qty": int(init_shares * 0.4), "avg_cost": init_price, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0}
-    ai_buy_hold = state.holdings.setdefault("ai_buy", {})
-    ai_sell_hold = state.holdings.setdefault("ai_sell", {})
-    ai_buy_hold[symbol] = {"qty": int(init_shares * 0.15), "avg_cost": init_price, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0}
-    ai_sell_hold[symbol] = {"qty": int(init_shares * 0.15), "avg_cost": init_price, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0}
+    mm_sell = state.holdings.setdefault("mmaker_sell", {})
+    mm_buy = state.holdings.setdefault("mmaker_buy", {})
+    mm_sell[symbol] = {"qty": int(init_shares * 0.25), "avg_cost": init_price, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0}
+    mm_buy[symbol] = {"qty": int(init_shares * 0.25), "avg_cost": init_price, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0}
     # Also allocate to some institutional bots
     for i in range(3):
         pid = f"inst_{i+1}"
