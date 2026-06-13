@@ -73,10 +73,12 @@ function handleWsMessage(msg) {
           }
         }
       }
-      // Capture time-share data
+      // Capture time-share data (per-stock dict)
       if (msg.data.timeshare) {
         gameState.timeshare = msg.data.timeshare;
-        setTimeshareData(gameState.timeshare); // only redraws if in timeshare mode
+        var _ts = gameState.selectedStock || (gameState.stocks.length > 0 ? gameState.stocks[0].symbol : '');
+        var _tsd = gameState.timeshare[_ts] || [];
+        setTimeshareData(_tsd);
       }
       // Capture trade tape
       if (msg.data.tape) {

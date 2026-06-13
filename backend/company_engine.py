@@ -121,10 +121,11 @@ async def _process_quarterly(state, tick_count):
                 revenue = c.employees * effective_rev_per_emp * sales_boost * mkt_boost * random_factor
                 revenue *= (1.0 + market_condition)
 
-                fixed_cost = 5000 + c.employees * 200
+                fixed_cost = 8000 + c.employees * 300
                 salary_cost = c.employees * base_cost_per_emp * cycle_mult * scale_factor
                 rd_spend = revenue * research_pct * 0.8
-                total_costs = fixed_cost + salary_cost + rd_spend
+                operating_cost = revenue * 0.25  # 25% materials/operations
+                total_costs = fixed_cost + salary_cost + rd_spend + operating_cost
                 profit = revenue - total_costs
                 interest_income = c.cash * 0.005
 
