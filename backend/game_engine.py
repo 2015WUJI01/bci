@@ -490,7 +490,6 @@ async def init_global_market():
     # Start loops as background tasks
     asyncio.create_task(price_tick_loop())
     asyncio.create_task(ai_trading_loop())
-    asyncio.create_task(npc_trading_loop())
     asyncio.create_task(quant_trading_loop())
     asyncio.create_task(retail_trading_loop())
     asyncio.create_task(zhuangjia_trading_loop())
@@ -1049,12 +1048,7 @@ async def ai_trading_loop():
                 await _ai_sell_tick(state)
             except Exception as e:
                 logger.error(f"AI sell error: {e}")
-        # AI market-making trades: create visible tape activity
-        if tick_count % 24 == 0:
-            try:
-                await _ai_market_trade(state)
-            except Exception as e:
-                logger.error(f"AI market trade error: {e}")
+        # AI market-making trades disabled — mmaker provides liquidity via execute_trade fallback
 
 
 async def _ai_clear_pending(player_id: str, order_type: str):
@@ -1081,7 +1075,7 @@ async def _ai_clear_pending(player_id: str, order_type: str):
 
 async def _ai_buy_tick(state):
     """AI buy bot: provides bid liquidity with 10-tier limit orders."""
-    pid = "ai_buy"
+    pid = "mmaker_buy"
     player = state.players.get(pid)
     if not player:
         return
@@ -1154,7 +1148,7 @@ async def _ai_buy_tick(state):
 
 async def _ai_sell_tick(state):
     """AI sell bot: provides ask liquidity with 10-tier limit orders."""
-    pid = "ai_sell"
+    pid = "mmaker_sell"
     player = state.players.get(pid)
     if not player:
         return
