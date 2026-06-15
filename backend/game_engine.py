@@ -2646,11 +2646,40 @@ async def execute_trade(player_id: str, data: dict):
         # 订单簿撮合：扫买单
         result = await _sweep_buy_orders(state, player_id, symbol, min(qty, available_qty))
         if result is None:
-            await manager.send_to(GLOBAL_ROOM_ID, player_id, {
-                "type": "trade_rejected",
-                "data": {"reason": "没有足够的买单，暂时无法成交", "stock_symbol": symbol},
-            })
-            return
+            # 无挂单时由 mmaker_buy 按市价买入（做市商兜底）
+            mm_buy_pid = "mmaker_buy"
+            mm_buy_cash = state.players.get(mm_buy_pid, {}).get("cash", 0) - state.players.get(mm_buy_pid, {}).get("frozen_cash", 0)
+            mm_qty = min(qty, available_qty, int(mm_buy_cash / max(stock.get("price", 1), 0.01)))
+            if mm_qty > 0:
+                mm_price = stock.get("price", 1)
+                mm_cost = round(mm_qty * mm_price, 2)
+                mm_comm = round(max(mm_cost * COMMISSION_RATE, MIN_COMMISSION), 2)
+                mm_total = mm_cost + mm_comm
+                if mm_total <= mm_buy_cash:
+                    state.players[mm_buy_pid]["cash"] = round(mm_buy_cash - mm_total, 2)
+                    mm_buy_h = state.holdings.setdefault(mm_buy_pid, {}).setdefault(symbol, {"qty": 0, "avg_cost": mm_price, "frozen_qty": 0, "short_qty": 0, "short_avg_cost": 0.0})
+                    mm_buy_h["qty"] += mm_qty
+                    mm_buy_h["avg_cost"] = round((mm_buy_h["avg_cost"] * (mm_buy_h["qty"] - mm_qty) + mm_cost) / mm_buy_h["qty"], 2) if mm_buy_h["qty"] > 0 else mm_price
+                    player["cash"] = round(player["cash"] + mm_cost - mm_comm, 2)
+                    holding["qty"] -= mm_qty
+                    stock["price"] = round(max(PRICE_MIN, min(PRICE_MAX, mm_price * 0.999)), 2)
+                    stock["volume"] = stock.get("volume", 0) + mm_qty
+                    stock["sell_volume"] = stock.get("sell_volume", 0) + mm_qty
+                    filled = mm_qty
+                    fill_avg_price = mm_price
+                    fill_commission = mm_comm
+                    fill_stamp = 0
+                    fill_fee = mm_comm
+                    fill_total_cost = mm_cost
+                    state.trade_tape.insert(0, {"time": datetime.utcnow().strftime("%H:%M:%S"), "price": mm_price, "quantity": mm_qty, "type": "sell", "side": "active_sell"})
+                    if len(state.trade_tape) > 100:
+                        state.trade_tape = state.trade_tape[:100]
+            else:
+                await manager.send_to(GLOBAL_ROOM_ID, player_id, {
+                    "type": "trade_rejected",
+                    "data": {"reason": "没有足够的买单，暂时无法成交", "stock_symbol": symbol},
+                })
+                return
 
         filled = result["filled_qty"]
         net_proceeds = round(result["total_proceeds"] - result["commission"] - result["stamp_tax"], 2)
