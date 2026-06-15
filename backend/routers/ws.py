@@ -73,6 +73,7 @@ async def websocket_endpoint(websocket: WebSocket, player_id: str = Query("")):
                             state.players[player_id]["cash"] = 500_000_000
                 mark_dirty(player_id)  # persist nickname to DB
                 # Send initial portfolio update using shared function
+                pdata = state.players[player_id]
                 from backend.game_engine import calc_player_portfolio
                 pf = calc_player_portfolio(state, player_id, pdata, state.holdings.get(player_id, {}))
                 await manager.send_to(GLOBAL_ROOM_ID, player_id, {
