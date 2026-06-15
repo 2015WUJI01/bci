@@ -145,6 +145,7 @@ async def get_my_company(user: User = Depends(_get_current_user)):
         employees=company.employees,
         quarter=company.quarter,
         alloc_pcts=alloc,
+        current_strategy=company.current_strategy or "balanced",
         tech_points=company.tech_points,
         share_price=current_price,
         shares_outstanding=company.shares_outstanding,
@@ -204,6 +205,8 @@ async def update_alloc(req: AllocRequest, user: User = Depends(_get_current_user
         if not c:
             raise HTTPException(404, "no company")
         c.alloc_pcts = json.dumps(alloc, ensure_ascii=False)
+        if req.strategy and req.strategy in ("balanced","aggressive","efficient","marketing"):
+            c.current_strategy = req.strategy
         await session.commit()
     return {"ok": True}
 

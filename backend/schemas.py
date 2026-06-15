@@ -63,6 +63,7 @@ class CompanyResponse(BaseModel):
     employees: int
     quarter: int
     alloc_pcts: dict
+    current_strategy: str = "balanced"
     tech_points: float = 0.0
     share_price: float
     shares_outstanding: int
@@ -107,6 +108,7 @@ class DecisionRequest(BaseModel):
 
 class AllocRequest(BaseModel):
     alloc_pcts: dict
+    strategy: str | None = None
 
 
 class AnnounceRequest(BaseModel):

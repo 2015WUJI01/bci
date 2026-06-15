@@ -467,10 +467,29 @@ function showAllocAdjustModal() {
   var body = document.getElementById('decision-body');
   body.innerHTML = '';
 
+  // Strategy selection
+  var strategies = [
+    {id:'balanced', name:'⚖️ 稳健经营', desc:'固定成本-10%，营收-5%', cost:-0.1, rev:-0.05},
+    {id:'aggressive', name:'🚀 激进扩张', desc:'营收+15%，成本+10%', rev:0.15, cost:0.1},
+    {id:'efficient', name:'🔧 成本优化', desc:'成本-15%，营收-10%', cost:-0.15, rev:-0.1},
+    {id:'marketing', name:'📢 市场渗透', desc:'销售加成+20%，研发效率-10%', sales_boost:0.2, rd_penalty:-0.1},
+  ];
+  var curStrategy = gameState.myCompany && gameState.myCompany.current_strategy;
+  var stratHtml = '<div class="decision-title" style="margin-top:8px;">📋 季度战略</div>' +
+    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">选择本季度的经营策略</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">';
+  strategies.forEach(function(s) {
+    var sel = s.id === (curStrategy || 'balanced') ? 'border-color:#3b82f6;background:rgba(59,130,246,0.1);' : '';
+    stratHtml += '<div class="industry-card" onclick="selectStrategy(\''+s.id+'\')" data-strat="'+s.id+'" style="cursor:pointer;padding:8px;background:var(--bg-card);border:2px solid var(--border-color);border-radius:6px;text-align:center;' + sel + '">' +
+      '<div style="font-size:12px;font-weight:600;color:#c0d0d8;">' + s.name + '</div>' +
+      '<div style="font-size:10px;color:#8899a6;margin-top:2px;">' + s.desc + '</div></div>';
+  });
+  stratHtml += '</div>';
+  // Allocation section
   var div = document.createElement('div');
   div.className = 'decision-item';
   div.innerHTML = '<div class="decision-title">利润分配</div>' +
-    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">调整各项分配比例，合计必须为100%</div>';
+    '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">调整各项分配比例</div>' + stratHtml;
 
   var adjustable = ['sales', 'dividend', 'research'];
   var sliders = {};
@@ -556,10 +575,21 @@ function showAllocAdjustModal() {
   modal.style.display = 'flex';
 }
 
+var _selectedStrategy = null;
+
+function selectStrategy(id) {
+  _selectedStrategy = id;
+  document.querySelectorAll('#decision-body .industry-card[data-strat]').forEach(function(el) {
+    el.style.borderColor = el.getAttribute('data-strat') === id ? '#3b82f6' : 'var(--border-color)';
+  });
+}
+
 async function saveAllocation() {
   try {
-    var result = await apiPost('/api/company/alloc', { alloc_pcts: pendingAlloc });
-    showToast('分配比例已保存！', 'success');
+    var body = { alloc_pcts: pendingAlloc };
+    if (_selectedStrategy) body.strategy = _selectedStrategy;
+    var result = await apiPost('/api/company/alloc', body);
+    showToast('保存成功！', 'success');
     hideDecisionModal();
     loadCompanyInfo();
   } catch (e) {

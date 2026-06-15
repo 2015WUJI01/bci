@@ -94,6 +94,22 @@ async def _process_quarterly(state, tick_count):
                 cycle = cycle_info.get("cycle", "normal")
                 cycle_mult = {"boom": 1.5, "normal": 1.0, "recession": 0.65}.get(cycle, 1.0)
 
+                # Apply strategy effects
+                strategy = c.current_strategy or "balanced"
+                strat_rev_mult = 1.0
+                strat_cost_mult = 1.0
+                strat_sales_bonus = 0.0
+                strat_rd_penalty = 0.0
+                if strategy == "aggressive":
+                    strat_rev_mult = 1.15
+                    strat_cost_mult = 1.10
+                elif strategy == "efficient":
+                    strat_cost_mult = 0.85
+                    strat_rev_mult = 0.90
+                elif strategy == "marketing":
+                    strat_sales_bonus = 0.20
+                    strat_rd_penalty = -0.10
+
                 sales_pct = alloc.get("sales", 25) / 100.0
                 research_pct = alloc.get("research", 25) / 100.0
                 reserve_pct = alloc.get("reserve", 25) / 100.0
@@ -103,7 +119,7 @@ async def _process_quarterly(state, tick_count):
                 extra["rnd_level"] = rnd_level
                 rnd_efficiency = 1.0 + (rnd_level - 1.0) * 0.3
 
-                sales_boost = 1.0 + sales_pct * 0.6
+                sales_boost = 1.0 + sales_pct * 0.6 + strat_sales_bonus
                 scale_factor = 1.0 + min(0.5, c.employees / 500 * 0.15)
 
                 mkt_boost = 1.0
@@ -118,11 +134,11 @@ async def _process_quarterly(state, tick_count):
                 trend_mult = trend ** quarters_since_start
 
                 effective_rev_per_emp = base_rev_per_emp * cycle_mult * rnd_efficiency * scale_factor * trend_mult
-                revenue = c.employees * effective_rev_per_emp * sales_boost * mkt_boost * random_factor
+                revenue = c.employees * effective_rev_per_emp * sales_boost * mkt_boost * random_factor * strat_rev_mult
                 revenue *= (1.0 + market_condition)
 
-                fixed_cost = 8000 + c.employees * 300
-                salary_cost = c.employees * base_cost_per_emp * cycle_mult * scale_factor
+                fixed_cost = (8000 + c.employees * 300) * strat_cost_mult
+                salary_cost = c.employees * base_cost_per_emp * cycle_mult * scale_factor * strat_cost_mult
                 rd_spend = revenue * research_pct * 0.8
                 operating_cost = revenue * 0.25  # 25% materials/operations
                 total_costs = fixed_cost + salary_cost + rd_spend + operating_cost
