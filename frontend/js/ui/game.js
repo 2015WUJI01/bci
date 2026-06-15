@@ -58,6 +58,8 @@ async function showGamePage() {
   if (sel) sel.value = gameState.selectedStock || '';
   renderNews();
   checkCompanyOnLogin();
+  showOnboarding();
+  checkAchievements();
 
   leaderboardInterval = setInterval(loadLeaderboard, 1000);
   startCountdownTimer();
@@ -1716,3 +1718,53 @@ async function submitDecision(decisionType, choice) {
 }
 
 
+
+
+// ============================================================
+// 新手指引
+// ============================================================
+function showOnboarding() {
+  if (localStorage.getItem('tutorial_done')) return;
+  var steps = [
+    { icon: '📝', title: '1. 注册公司', desc: '点击 🏢 按钮，选择行业创建你的公司。' },
+    { icon: '💰', title: '2. 买卖股票', desc: '交易面板选择股票，输入数量，点击买入/卖出。' },
+    { icon: '📊', title: '3. 季度经营', desc: '每5分钟结算一次季度，调整分配比例。' },
+    { icon: '🎯', title: '4. 赚取利润', desc: '扩大公司规模，提升股价，成为第一！' },
+  ];
+  var html = '<div style="padding:8px;">';
+  steps.forEach(function(s) {
+    html += '<div style="display:flex;gap:10px;margin-bottom:12px;padding:8px;background:#1a2a35;border-radius:6px;">' +
+      '<span style="font-size:24px;">' + s.icon + '</span>' +
+      '<div><div style="font-weight:700;color:#c0d0d8;font-size:13px;">' + s.title + '</div>' +
+      '<div style="font-size:12px;color:#8899a6;margin-top:2px;">' + s.desc + '</div></div></div>';
+  });
+  html += '</div>';
+  var modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  modal.innerHTML = '<div class="modal-box" style="width:420px;">' +
+    '<div class="modal-title">🎮 新手指南</div>' + html +
+    '<div class="modal-actions"><button class="modal-btn modal-btn-primary" onclick="this.closest('.modal-overlay').remove();localStorage.setItem('tutorial_done','1')">我知道了</button></div></div>';
+  document.body.appendChild(modal);
+}
+
+// ============================================================
+// 成就系统
+// ============================================================
+function checkAchievements() {
+  var unlocked = JSON.parse(localStorage.getItem('achievements') || '[]');
+  var checks = [
+    {id:'first_company', name:'创业先锋', desc:'创建公司', ok: function(){return gameState.myCompany!=null;}},
+    {id:'first_trade', name:'第一笔交易', desc:'完成交易', ok: function(){return (gameState.holdings||[]).length>0;}},
+    {id:'assets_1m', name:'百万富翁', desc:'总资产¥100万', ok: function(){return (gameState.totalAssets||0)>=1000000;}},
+    {id:'assets_10m', name:'千万富豪', desc:'总资产¥1000万', ok: function(){return (gameState.totalAssets||0)>=10000000;}},
+  ];
+  checks.forEach(function(a) {
+    if (unlocked.indexOf(a.id) >= 0) return;
+    if (a.ok()) {
+      unlocked.push(a.id);
+      localStorage.setItem('achievements', JSON.stringify(unlocked));
+      showToast('🏆 ' + a.name + ' — ' + a.desc, 'success');
+    }
+  });
+}

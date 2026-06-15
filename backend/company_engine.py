@@ -179,6 +179,25 @@ async def _process_quarterly(state, tick_count):
                     pe_mult = base_pe * 0.5 * cycle_mult
                 c.share_price = round(max(0.01, nav + eps * pe_mult), 2)
 
+                # 破产检测：现金为负连续2季度则破产重置
+                bankrupt_q = extra.get("_bankrupt_quarters", 0)
+                if c.cash < 0:
+                    bankrupt_q += 1
+                    extra["_bankrupt_quarters"] = bankrupt_q
+                    if bankrupt_q >= 2:
+                        # 破产重置
+                        from backend.industry_config import INDUSTRY_STARTUP
+                        startup_reset = INDUSTRY_STARTUP.get(c.industry, {})
+                        c.cash = startup_reset.get("cash", 50000)
+                        c.total_assets = startup_reset.get("assets", 50000)
+                        c.employees = startup_reset.get("employees", 10)
+                        c.revenue = 0
+                        c.profit = 0
+                        extra["_bankrupt_quarters"] = 0
+                        logger.warning("Company %s (%s) bankrupt! Reset to initial state.", c.name, c.symbol)
+                else:
+                    extra["_bankrupt_quarters"] = 0
+
                 base_rev = round(c.employees * base_rev_per_emp, 2)
                 prev_r = await session.execute(
                     select(CompanyQuarterly)
