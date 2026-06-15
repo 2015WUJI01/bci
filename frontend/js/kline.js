@@ -95,11 +95,11 @@ function toggleChartMode(mode) {
   var lc = document.getElementById('lc-chart');
   if (showTimeshare) {
     if (cv) cv.style.display = '';
-    if (lc) lc.style.display = 'none';
+    if (lc) { lc.style.display = 'none'; }
     drawTimeshare();
   } else {
     if (cv) cv.style.display = 'none';
-    if (lc) lc.style.display = '';
+    if (lc) { lc.style.display = ''; initLC(); if (_chart) setTimeout(function(){_chart.resize(lc.clientWidth,lc.clientHeight);},50); }
     drawKline();
   }
 }
@@ -109,7 +109,7 @@ function drawTimeshare() {
   if (!canvas) return;
   var ctx = canvas.getContext('2d');
   var rect = canvas.parentElement.getBoundingClientRect();
-  var W = canvas.width = rect.width - 0, H = canvas.height = rect.height - 0;
+  var W = canvas.width = Math.max(rect.width, 300) - 0; canvas.style.width = W + "px"; var H = canvas.height = Math.max(rect.height, 280); canvas.style.height = H + "px";
   if (W <= 0 || H <= 0) return;
   ctx.clearRect(0, 0, W, H);
   var data = timeshareData || [];

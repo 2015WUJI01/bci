@@ -1070,6 +1070,8 @@ function renderComprank(data) {
   el.innerHTML = html;
 }
 
+function closeComprankPanel() { var p=document.getElementById("floating-comprank-panel"); if(p){p.classList.remove("visible");p.style.display="none";} }
+
 function toggleComprankPanel() {
   var panel = document.getElementById('floating-comprank-panel');
   if (!panel) return;
