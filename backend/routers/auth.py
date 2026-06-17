@@ -1,3 +1,4 @@
+from typing import Optional
 import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, Header
@@ -21,7 +22,7 @@ async def get_current_user(token: str = Header(alias="x-auth-token"), session: A
     return user
 
 
-async def get_optional_user(token: str | None = Header(default=None, alias="x-auth-token"), session: AsyncSession = Depends(get_session)):
+async def get_optional_user(token: Optional[str] = Header(default=None, alias="x-auth-token"), session: AsyncSession = Depends(get_session)):
     if not token:
         return None
     r = await session.execute(select(User).where(User.token == token))
@@ -78,7 +79,7 @@ async def login(req: LoginRequest, session: AsyncSession = Depends(get_session))
 
 
 @router.get("/me")
-async def me(user: User | None = Depends(get_optional_user)):
+async def me(user: Optional[User] = Depends(get_optional_user)):
     if not user:
         return {"ok": False}
     return {"ok": True, "token": user.token, "username": user.nickname or user.username, "user_id": user.id, "email": user.username}

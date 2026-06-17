@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from typing import Optional
 from collections import defaultdict
 
 from fastapi import WebSocket
@@ -41,7 +42,7 @@ class RoomConnectionManager:
                 pass
             logger.info(f"Player {player_id} disconnected from room {room_id}")
 
-    async def broadcast(self, room_id: str, message: dict, exclude: str | None = None):
+    async def broadcast(self, room_id: str, message: dict, exclude: Optional[str] = None):
         if room_id not in _rooms:
             return
         connections = _rooms[room_id]["connections"]
@@ -67,11 +68,11 @@ class RoomConnectionManager:
     def get_connections(self, room_id: str) -> dict[str, WebSocket]:
         return _rooms.get(room_id, {}).get("connections", {})
 
-    def set_game_task(self, room_id: str, task: asyncio.Task | None):
+    def set_game_task(self, room_id: str, task: Optional[asyncio.Task]):
         if room_id in _rooms:
             _rooms[room_id]["game_task"] = task
 
-    def set_end_task(self, room_id: str, task: asyncio.Task | None):
+    def set_end_task(self, room_id: str, task: Optional[asyncio.Task]):
         if room_id in _rooms:
             _rooms[room_id]["end_task"] = task
 

@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -5,7 +6,7 @@ from pydantic import BaseModel, Field
 class LoginRequest(BaseModel):
     email: str = Field(min_length=1, max_length=50)
     password: str = Field(default="", max_length=100)
-    nickname: str | None = Field(default=None, max_length=20)
+    nickname: Optional[str] = Field(default=None, max_length=20)
 
 
 class AuthResponse(BaseModel):
@@ -98,7 +99,7 @@ class IndustryInfo(BaseModel):
 class CashActionRequest(BaseModel):
     action_type: str
     amount: float = 0
-    target_industry: str | None = None
+    target_industry: Optional[str] = None
 
 
 class DecisionRequest(BaseModel):
@@ -108,7 +109,7 @@ class DecisionRequest(BaseModel):
 
 class AllocRequest(BaseModel):
     alloc_pcts: dict
-    strategy: str | None = None
+    strategy: Optional[str] = None
 
 
 class AnnounceRequest(BaseModel):

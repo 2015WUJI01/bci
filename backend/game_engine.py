@@ -16,7 +16,7 @@ from backend.config import (
 from backend.database import async_session
 from backend.models import Transaction, PlayerState, Holding, User, Company, CompanyQuarterly
 from backend.websocket_manager import manager, game_state_store
-from sqlalchemy import select, desc, update as sql_update
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -1329,7 +1329,7 @@ def init_npcs(state):
         }
 
 
-def _ma(history: list[float], period: int) -> float | None:
+def _ma(history: list[float], period: int) -> Optional[float]:
     """计算移动平均，数据不足返回 None。"""
     if len(history) < period:
         return None
@@ -2288,7 +2288,7 @@ async def zhuangjia_trading_loop():
 # ---------------------------------------------------------------------------
 # Trade execution — 订单簿撮合引擎
 # ---------------------------------------------------------------------------
-async def _sweep_sell_orders(state, buyer_id: str, symbol: str, qty: int, max_cash: float) -> dict | None:
+async def _sweep_sell_orders(state, buyer_id: str, symbol: str, qty: int, max_cash: float) -> Optional[dict]:
     """扫卖单：市价买入时从最低卖单开始吃。
     Returns {filled_qty, avg_price, last_price, total_cost, commission, fills} or None."""
     # 收集所有卖单（排除自己的），按价格升序排列
@@ -2382,7 +2382,7 @@ async def _sweep_sell_orders(state, buyer_id: str, symbol: str, qty: int, max_ca
     }
 
 
-async def _sweep_buy_orders(state, seller_id: str, symbol: str, qty: int) -> dict | None:
+async def _sweep_buy_orders(state, seller_id: str, symbol: str, qty: int) -> Optional[dict]:
     """扫买单：市价卖出时从最高买单开始砸。
     Returns {filled_qty, avg_price, last_price, total_proceeds, commission, stamp_tax, fills} or None."""
     buys = []
