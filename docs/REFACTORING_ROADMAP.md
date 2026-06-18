@@ -204,11 +204,10 @@ jjs-web/                # 前端源码目录
 |------|------|
 | `internal/engine/industry.go` | 6 行业完整常量配置（PE/人均营收/起始参数/天花板参数/淤积类型） |
 | `internal/store/company.go` | 公司 CRUD + 建造队列 + 季度报表查询 |
-| `internal/handler/company.go` | `POST /api/company/create` + `GET /api/company/state` |
+| `internal/handler/company.go` | `POST /api/company/create` + `GET /api/company/state` + `GET /api/company/quarterly` |
 | `internal/router/router.go` | 从 main.go 提取全部路由注册 |
 
-**Company 模型新增字段**：
-
+**Company 模型**：
 ```go
 type Company struct {
     gorm.Model
@@ -220,17 +219,15 @@ type Company struct {
     Employees int       // 员工数（驱动力）
     Quarter   int       // 当前季度
     Status    string    // active | bankrupt
-    // P2.1 新增
-    TotalShares int     // 总股本（创建时由玩家通过融资比例决定）
-    CEOShares   int64   // CEO持股数（创建时固定 10,000 股）
-    CapCount    int     // 天花板单元数量
-    Inventory   float64 // 物理淤积量（制造/能源库存，其余行业=0）
-    SludgeLevel int     // 状态淤积等级（消费品牌冷却/医疗管线积压）
+    TotalShares int     // 总股本
+    CEOShares   int64   // CEO持股数
+    CapCount    int     // 产线数量
+    Inventory   int64   // 库存（整数）
+    Demand      float64 // 当季需求
 }
 ```
 
-**CapBuildOrder 表（新建）**：
-
+**CapBuildOrder 表**：
 ```go
 type CapBuildOrder struct {
     gorm.Model
@@ -240,43 +237,59 @@ type CapBuildOrder struct {
 }
 ```
 
-支持多季度连续扩产：每次扩产插入一行，季度结算时检查到期行，建造成本立即扣除。
+**CompanyQuarterly 表（季度快照）**：
+```go
+type CompanyQuarterly struct {
+    ID              uint      // 主键
+    CompanyID       uint      // 所属公司
+    Quarter         int       // 全局季度号（从 GlobalQuarter 取，前端计算 Y/Q）
+    Revenue         float64   // 当季营收
+    Profit          int64     // 净利润
+    Cash            int64     // 期末现金
+    LaborCost       int64     // 人力成本 = 员工 × mfgLaborRate
+    BaseMaintenance int64     // 基础维护费 = 全部产线 × BaseMaintenanceRate
+    OperationalCost int64     // 运营成本 = 开工产线 × OperationalCostRate
+    WarehouseCost   int64     // 仓储费 = 库存 × ¥0.5/件
+    TotalCost       int64     // 总成本 = 人力 + 基础维护 + 运营 + 仓储
+    SalesQty        int64     // 当季销售量（整数件）
+    ProdQty         int64     // 当季生产量（整数件）
+    Employees       int       // 员工数
+    TotalShares     int       // 总股本
+    CEOShares       int64     // CEO持股
+    CapCount        int       // 产线数
+    Inventory       int64     // 季末库存（整数件）
+    Demand          float64   // 当季需求
+    CreatedAt       time.Time
+}
+```
 
-**CompanyQuarterly 新增快照字段**：`TotalShares`, `CEOShares`, `CapCount`, `Inventory`, `SludgeLevel`
-——创建公司时自动写入 Q0 快照（`quarter=0`）作为图表起始点。
+**成本拆分模型**（替代旧单一维护费字段）：
+```
+BaseMaintenance  = CapCount × BaseMaintenanceRate    // 所有产线的基础维护（含闲置）
+OperationalCost  = activeLines × OperationalCostRate // 仅开工产线的运营消耗
+LaborCost        = employees × mfgLaborRate          // 人力工资
+WarehouseCost    = inventory × mfgWarehouseCostRate  // 仓储费
+TotalCost        = LaborCost + BaseMaintenance + OperationalCost + WarehouseCost
+Profit           = Revenue - TotalCost
+```
+各行业费率（制造例：Base=1000, Op=2000，旧值 Active=3000/Idle=1000 → Base+Op 等价总和无变更）。
 
-**行业三维的 DB 表示**（设计文档 §七细化）：
+**季度结算**：当前仅制造行业启用——非制造业 `settleCompanyBaseline` 直接 `return nil`，待具体行业设计后实现。`formatPeriod` 已删除，季度格式化由前端 `Math.floor((q-1)/4)+1` + `(q-1)%4+1` 计算。
 
-淤积拆分为 2 个通用字段覆盖 6 个行业：
-- `Inventory float64` — 物理累积量（制造/能源，其余行业=0）
-- `SludgeLevel int` — 状态计数器（消费/医疗，其余行业=0）
-- 科技/金融的淤积（闲置容量/资金）在季度结算时即时计算
+**启动恢复**：`cmd/server/main.go` 启动时调用 `engine.RestoreOrSeedGlobalQuarter()`——DB 无景气度数据则种入所有行业 Q1=1.0 且 `GlobalQuarter=1`；有数据则恢复到最大季度。`GlobalQuarter` 不再硬编码为 1，重启后季度号连续。
 
-天花板建造前置期在 v1 实现：`CapBuildOrder.ReadyQuarter` 记录完成季度。
-
-**融资创建流程**（本次新增）：
-- 玩家初始现金 **10,000 → 100,000**
-- 创建时玩家选择：发行总股本（1万-20万）、自身出资额
-- CEO 固定持股 **10,000 股**，出资比例 = 10,000 / 总股本（5%-100%）
-- 公司初始资金 = 自身出资 / 出资比例（含社会融资部分）
-- 初始产能（CapCount=1）+ 初始员工（StartingEmployees）免费提供
-- 行业控制开关 `IndustryConfig.Enabled`，当前全部 `false`（行业逐步开放）
-- IPO 暂不可用，公司股票不进入二级市场交易
-
-**API**（路径不使用 `/v2/` 前缀）：
+**API**：
 
 | 方法 | 路径 | 认证 | 说明 |
 |------|------|------|------|
-| POST | `/api/company/create` | JWT | 创建公司（含融资参数），自动生成 Symbol + Q0 快照 + 扣玩家现金 |
-| GET | `/api/company/state` | JWT | 返回公司完整状态（含 ceo_shares/social_shares/own_ratio + 季度历史 + 待建造队列） |
-
-**路由拆分**：`internal/router/router.go` 独立维护路由注册，`cmd/server/main.go` 精简为引导逻辑。
+| POST | `/api/company/create` | JWT | 创建公司，初始季度 = 当前 `GlobalQuarter` 值 |
+| GET | `/api/company/state` | JWT | 返回公司完整状态（含季度历史 + 待建造队列） |
+| GET | `/api/company/quarterly` | JWT | 返回当前用户公司全部季度报表 |
 
 **前端**：
-- `types/index.ts`：`CompanyState` 扩展 `ceo_shares`/`social_shares`/`own_ratio`，`QuarterlyReport` 扩展 `ceo_shares`
-- `api/queries.ts`：API 路径去掉 `/v2/` 前缀
-- `pages/CompanyPage.tsx`：无公司→融资创建表单（行业选择+总股本滑块+投资滑块+股权概览），有公司→仪表盘+季度报表
-- 所有行业标注"即将开放"，创建按钮在未开放行业时禁用提示
+- `pages/QuarterlyPage.tsx`：独立历史报表页（路由 `/game/company/quarterly`），列表展示 季度/营收/利润/总成本/利润率/期末现金，点击行弹出 Modal 详情（成本组成 + 运营指标 + 股权数据）
+- `pages/CompanyPage.tsx`：财务表现面板新增上季总成本/成本率 + 「查看历史报表 →」按钮，底部季度表已移除
+- `types/index.ts`：`QuarterlyReport` 扩大为含全部成本字段
 - 响应式布局：窄屏 2 列、宽屏 3 列行业卡片，窄屏纵向滑块、宽屏并排滑块
 
 ### P2.2: AP 行动系统（待 Company 表加 AP/APCap 字段时实现）
