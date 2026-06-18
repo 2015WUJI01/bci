@@ -30,17 +30,19 @@ type registerRequest struct {
 
 type authResponse struct {
 	Token    string `json:"token"`
-	Username string `json:"username"`
-	UserID   string `json:"user_id"`
+	Nickname string `json:"nickname"`
+	PlayerID string `json:"player_id"`
 	Email    string `json:"email"`
+	IsAdmin  bool   `json:"is_admin"`
 }
 
 type meResponse struct {
 	OK       bool   `json:"ok"`
 	Token    string `json:"token,omitempty"`
-	Username string `json:"username,omitempty"`
-	UserID   string `json:"user_id,omitempty"`
+	Nickname string `json:"nickname,omitempty"`
+	PlayerID string `json:"player_id,omitempty"`
 	Email    string `json:"email,omitempty"`
+	IsAdmin  bool   `json:"is_admin,omitempty"`
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -80,9 +82,10 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	WriteJSON(w, http.StatusCreated, authResponse{
 		Token:    token,
-		Username: user.Nickname,
-		UserID:   user.ID,
+		Nickname: user.Nickname,
+		PlayerID: user.ID,
 		Email:    user.Username,
+		IsAdmin:  user.IsAdmin,
 	})
 }
 
@@ -127,9 +130,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	WriteJSON(w, http.StatusOK, authResponse{
 		Token:    token,
-		Username: user.Nickname,
-		UserID:   user.ID,
+		Nickname: user.Nickname,
+		PlayerID: user.ID,
 		Email:    user.Username,
+		IsAdmin:  user.IsAdmin,
 	})
 }
 
@@ -146,9 +150,10 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	WriteJSON(w, http.StatusOK, meResponse{
 		OK:       true,
-		Username: user.Nickname,
-		UserID:   user.ID,
+		Nickname: user.Nickname,
+		PlayerID: user.ID,
 		Email:    user.Username,
+		IsAdmin:  user.IsAdmin,
 	})
 }
 

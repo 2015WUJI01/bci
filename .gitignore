@@ -3,6 +3,8 @@ __pycache__/
 *.db
 *.log
 .env
+.env.local
+.env.*.local
 _*.py
 deploy.py
 fix_*.py

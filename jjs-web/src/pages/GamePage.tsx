@@ -110,22 +110,22 @@ function FloatingPanels() {
   return (
     <div className="fixed top-20 right-5 space-y-3 z-50">
       {panels.orderBook && (
-        <FloatingPanel title="盘口" className="w-72">
+        <FloatingPanel title="盘口" panelKey="orderBook" className="w-72">
           <div className="p-6 text-center text-text-muted text-xs">暂无数据</div>
         </FloatingPanel>
       )}
       {panels.tradeTape && (
-        <FloatingPanel title="逐笔成交" className="w-72">
+        <FloatingPanel title="逐笔成交" panelKey="tradeTape" className="w-72">
           <div className="p-6 text-center text-text-muted text-xs">暂无数据</div>
         </FloatingPanel>
       )}
       {panels.news && (
-        <FloatingPanel title="市场新闻" className="w-72">
+        <FloatingPanel title="市场新闻" panelKey="news" className="w-72">
           <div className="p-6 text-center text-text-muted text-xs">暂无新闻</div>
         </FloatingPanel>
       )}
       {panels.leaderboard && (
-        <FloatingPanel title="排行榜" className="w-72">
+        <FloatingPanel title="排行榜" panelKey="leaderboard" className="w-72">
           <div className="p-6 text-center text-text-muted text-xs">加载中...</div>
         </FloatingPanel>
       )}
@@ -135,10 +135,12 @@ function FloatingPanels() {
 
 function FloatingPanel({
   title,
+  panelKey,
   children,
   className = '',
 }: {
   title: string
+  panelKey: 'trade' | 'orderBook' | 'tradeTape' | 'news' | 'leaderboard' | 'company' | 'admin' | 'margin'
   children: React.ReactNode
   className?: string
 }) {
@@ -149,7 +151,7 @@ function FloatingPanel({
       <div className="flex items-center justify-between px-3 py-2 bg-gradient-header border-b border-border">
         <span className="text-[13px] font-bold tracking-wide">{title}</span>
         <button
-          onClick={() => togglePanel('orderBook')}
+          onClick={() => togglePanel(panelKey)}
           className="bg-white/5 border border-border text-text-muted px-1.5 py-0.5 text-xs rounded transition-colors hover:bg-white/10 hover:text-text-primary"
         >
           ✕

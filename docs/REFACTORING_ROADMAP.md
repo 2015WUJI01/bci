@@ -18,7 +18,7 @@
 
 | 阶段 | 内容 | 预估工作量 | 风险 | 目标产出 |
 |------|------|-----------|------|----------|
-| **P1** | 项目骨架与基础设施 | 3-4 天 | 低 | Go 项目 + React 项目骨架可运行 |
+| **P1** | 项目骨架与基础设施 | 3-4 天 | 低 | ✅ 已完成 |
 | **P2** | 公司运营 v2 + 个人资产 | 7-9 天 | 中 | AP 行动点系统、董事会/KPI、研发、随机事件、玩家资产 |
 | **P3** | 核心交易引擎 | 5-7 天 | 高 | 订单簿、撮合、行情、股票交易 |
 | **P4** | AI 交易者系统 | 4-5 天 | 中 | 6 类 Bot 全部实现 |
@@ -146,6 +146,33 @@ jjs-web/                # 前端源码目录
 - 暗色主题基础 Tailwind 配置（参考旧版 `style.css` 配色）
 - AuthPage（登录/注册表单）
 - GamePage（空壳，等待后续阶段填充）
+
+### P1 完成状态（2026-06-18）
+
+> P1 骨架已全部实现并在本地验证通过。Go 后端与 React 前端的 auth 链路（注册→登录→JWT→bcrypt→SPA 路由）完整贯通。
+
+**jjs-server（全部完成）**：
+- Go 项目初始化，依赖齐全（chi / gorm + mysql / golang-jwt / bcrypt / envconfig / slog）
+- `config.go`：完整迁移旧版常量 + env + config.json 三层配置合并
+- `models.go`：7 个 GORM 模型定义完备（含 v2 公司字段：AP、董事会、研发、KPI、冷却、流通股等）
+- `store/`：GORM+MySQL 连接池 + AutoMigrate 自动建表 + 用户 CRUD（bcrypt）
+- `handler/`：注册/登录/Me 端点，JWT HS256 签发，bcrypt 密码校验
+- `middleware/`：JWT 鉴权 + 可选鉴权 + CORS + 前端静态文件 SPA fallback
+- `cmd/server/`：chi router 组装 + graceful shutdown
+
+**jjs-web（骨架完成，以下为 P1 范围内的待完善项）**：
+- Vite + React 18 + TypeScript + Tailwind CSS + Zustand + TanStack Query 全部就位
+- authStore（persist to localStorage）+ gameStore（WS 数据 + UI 状态）
+- ApiClient（auto-attach JWT, 401 auto-logout）+ WsClient（exponential backoff reconnect）
+- 11 个 TanStack Query hooks 已定义（对接 P2-P6 后端端点，仅骨架；enable 条件控制）
+- AuthPage：登录/注册双 Tab，错误处理，loading 状态
+- GamePage：两栏布局 + 浮动面板系统骨架
+- 完整的 TS 类型定义（35+ 接口，对齐 v2 领域模型）
+
+**P1 遗留事项（不阻塞 P2，可在后续顺手修复）**：
+- ESLint 配置缺失（ESLint v9 需要 `eslint.config.js`，当前无配置文件，`pnpm lint` 报错）
+- TanStack Router 已安装但未使用——当前仅 2 页，用简单条件渲染替代路由；P7 阶段再接入
+- Header 现金显示为硬编码 `¥--`——等待 P2 个人资产系统接入后替换
 
 ---
 
@@ -659,7 +686,7 @@ internal/handler/
 ## 里程碑汇总
 
 ```
-Week 1:      P1 项目骨架（Go+GORM+MySQL + React 骨架可运行）
+✅ P1 完成 (2026-06-18): 项目骨架（Go+GORM+MySQL + React 骨架可运行）
 Week 2-3:    P2 公司运营 v2（AP 系统/董事会/研发/事件）+ 个人资产
 Week 3-4:    P3 核心交易引擎（订单簿、撮合、行情，对接 v2 股价公式）
 Week 5:      P4 AI 交易者（6 类 Bot）
@@ -670,8 +697,7 @@ Week 9-10:   P8 测试与收尾（含数值验证）
 ```
 
 > **双人并行方案** (5-6 周):
-> - 后端始终比前端领先 1 个阶段
-> - Week 1: 两人一起 P1
+> - Week 1: 两人一起 P1 ✅
 > - Week 1-2: 后端 P2, 前端 P7.1-P7.2 (用 mock 数据)
 > - Week 2-3: 后端 P2 收尾 + P3, 前端 P7.3-P7.4
 > - Week 3-4: 后端 P4-P5, 前端 P7.4 收尾

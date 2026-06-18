@@ -17,8 +17,14 @@ class WsClient {
 
     this.disconnect()
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const url = `${protocol}//${window.location.host}/ws?player_id=${playerId}`
+    const wsBase = import.meta.env.VITE_WS_URL
+    let url: string
+    if (wsBase) {
+      url = `${wsBase}?player_id=${playerId}`
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      url = `${protocol}//${window.location.host}/ws?player_id=${playerId}`
+    }
 
     this.ws = new WebSocket(url)
 
