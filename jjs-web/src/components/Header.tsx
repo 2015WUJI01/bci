@@ -42,8 +42,8 @@ export function Header({ cash, nickname: playerNickname, globalQuarter }: Header
           入市请谨慎 · 投资有风险
         </span>
         {globalQuarter != null && globalQuarter > 0 && (
-          <span className="hidden sm:inline text-xs px-2.5 py-0.5 rounded-xl bg-bg-input text-text-secondary whitespace-nowrap">
-            第{Math.floor((globalQuarter - 1) / 4) + 1}年
+          <span className="text-xs px-2.5 py-0.5 rounded-xl bg-bg-input text-text-secondary whitespace-nowrap">
+            {Math.floor((globalQuarter - 1) / 4) + 1}年 第{((globalQuarter - 1) % 4) + 1}季
           </span>
         )}
         {tickCountdown > 0 && (

@@ -7,7 +7,7 @@ import type { QuarterlyReport } from '@/types'
 function formatQuarter(q: number) {
   const year = Math.floor((q - 1) / 4) + 1
   const qnum = ((q - 1) % 4) + 1
-  return `Y${year}Q${qnum}`
+  return `${year}年第${qnum}季`
 }
 
 function formatRatio(part: number, total: number) {
