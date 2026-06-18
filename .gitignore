@@ -20,3 +20,9 @@ qr_share.png
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Go backend local config
+jjs-server/config.json
+
+tmp/
+bin/
