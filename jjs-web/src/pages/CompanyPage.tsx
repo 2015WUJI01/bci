@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { api } from '@/api/client'
 import { useCompanyState, usePlayerInfo } from '@/api/queries'
 import { Panel } from '@/components/Panel'
@@ -237,45 +238,36 @@ export function CompanyPage() {
           </Panel>
 
           <Panel title="财务表现">
-            <div className="p-3">
+            <div className="p-3 space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <MetricCard label="上季营收" value={`¥${company.revenue.toLocaleString()}`} />
                 <MetricCard label="上季利润" value={`¥${company.profit.toLocaleString()}`} />
+                {(() => {
+                  const lastQ = company.quarterly?.filter(q => q.quarter > 0).slice(-1)[0]
+                  return lastQ ? (
+                    <>
+                      <MetricCard label="上季总成本" value={`¥${lastQ.total_cost.toLocaleString()}`} />
+                      <MetricCard
+                        label="成本率"
+                        value={`${lastQ.revenue > 0 ? (lastQ.total_cost / lastQ.revenue * 100).toFixed(1) : '0'}%`}
+                      />
+                    </>
+                  ) : null
+                })()}
               </div>
+              <Link
+                to="/game/company/quarterly"
+                className="block w-full text-center text-xs text-accent-blue hover:text-accent-blue/80 transition-colors py-1.5 rounded border border-accent-blue/20 hover:border-accent-blue/40"
+              >
+                查看历史报表 →
+              </Link>
             </div>
           </Panel>
 
-          {company.quarterly && company.quarterly.length > 1 && (
-            <Panel title="季度报表">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-text-muted border-b border-border">
-                      <th className="p-2 text-left">季度</th>
-                      <th className="p-2 text-right">营收</th>
-                      <th className="p-2 text-right">利润</th>
-                      <th className="p-2 text-right">现金</th>
-                      <th className="p-2 text-right">员工</th>
-                      <th className="p-2 text-right">产能</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {company.quarterly.filter(q => q.quarter > 0).slice(-8).map((q) => (
-                      <tr key={q.ID} className="border-b border-border/50 hover:bg-bg-hover">
-                        <td className="p-2 text-text-secondary">Q{q.quarter}</td>
-                        <td className="p-2 text-right text-text-primary">¥{q.revenue.toLocaleString()}</td>
-                        <td className={`p-2 text-right ${q.profit >= 0 ? 'text-up' : 'text-down'}`}>
-                          ¥{q.profit.toLocaleString()}
-                        </td>
-                        <td className="p-2 text-right text-text-primary">¥{q.cash.toLocaleString()}</td>
-                        <td className="p-2 text-right text-text-primary">{q.employees}人</td>
-                        <td className="p-2 text-right text-text-primary">{q.cap_count}组</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
+          {company.pending_builds > 0 && (
+            <div className="mt-2 text-xs text-accent-gold">
+              ⏳ {company.pending_builds} 个产能正在建造中
+            </div>
           )}
         </div>
       )}

@@ -151,10 +151,16 @@ export interface QuarterlyReport {
   ID: number
   CompanyID: number
   quarter: number
-  period: string
   revenue: number
   profit: number
   cash: number
+  labor_cost: number
+  base_maintenance: number
+  operational_cost: number
+  warehouse_cost: number
+  total_cost: number
+  sales_qty: number
+  prod_qty: number
   employees: number
   total_shares: number
   ceo_shares: number

@@ -71,20 +71,26 @@ type CapBuildOrder struct {
 }
 
 type CompanyQuarterly struct {
-	ID        uint      `gorm:"primaryKey;autoIncrement"`
-	CompanyID uint      `gorm:"index;not null"`
-	Quarter   int       `gorm:"not null"`
-	Period    string    `gorm:"type:varchar(20);not null"`
-	Revenue   float64   `gorm:"not null;default:0"`
-	Profit    float64   `gorm:"not null;default:0"`
-	Cash      float64   `gorm:"not null;default:0"`
-	Employees int       `gorm:"not null;default:0"`
-	TotalShares int     `gorm:"not null;default:0"`
-	CEOShares   int64   `gorm:"not null;default:0"`
-	CapCount    int     `gorm:"not null;default:0"`
-	Inventory   int64 `gorm:"not null;default:0"`
-	Demand      float64   `gorm:"not null;default:0"`
-	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	ID              uint      `json:"ID" gorm:"primaryKey;autoIncrement"`
+	CompanyID       uint      `json:"CompanyID" gorm:"index;not null"`
+	Quarter         int       `json:"quarter" gorm:"not null"`
+	Revenue         float64   `json:"revenue" gorm:"not null;default:0"`
+	Profit          int64     `json:"profit" gorm:"not null;default:0"`
+	Cash            int64     `json:"cash" gorm:"not null;default:0"`
+	LaborCost       int64     `json:"labor_cost" gorm:"not null;default:0"`
+	BaseMaintenance int64     `json:"base_maintenance" gorm:"not null;default:0"`
+	OperationalCost int64     `json:"operational_cost" gorm:"not null;default:0"`
+	WarehouseCost   int64     `json:"warehouse_cost" gorm:"not null;default:0"`
+	TotalCost       int64     `json:"total_cost" gorm:"not null;default:0"`
+	SalesQty        int64     `json:"sales_qty" gorm:"not null;default:0"`
+	ProdQty         int64     `json:"prod_qty" gorm:"not null;default:0"`
+	Employees       int       `json:"employees" gorm:"not null;default:0"`
+	TotalShares     int       `json:"total_shares" gorm:"not null;default:0"`
+	CEOShares       int64     `json:"ceo_shares" gorm:"not null;default:0"`
+	CapCount        int       `json:"cap_count" gorm:"not null;default:0"`
+	Inventory       int64     `json:"inventory" gorm:"not null;default:0"`
+	Demand          float64   `json:"demand" gorm:"not null;default:0"`
+	CreatedAt       time.Time `json:"CreatedAt" gorm:"autoCreateTime"`
 }
 type IndustryProsperity struct {
 	ID         uint      `gorm:"primaryKey;autoIncrement"`

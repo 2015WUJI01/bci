@@ -2,6 +2,7 @@ package engine
 
 import (
 	"log/slog"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -12,10 +13,6 @@ import (
 )
 
 var GlobalQuarter atomic.Int64
-
-func init() {
-	GlobalQuarter.Store(1)
-}
 
 type Ticker struct {
 	cron *cron.Cron
@@ -111,48 +108,53 @@ func settleCompanyBaseline(c *domain.Company, quarter int) error {
 		return settleManufacturing(c, cfg, prosperity, quarter, false)
 	}
 
-	// Non-manufacturing: simple revenue model
-	return settleAbstract(c, cfg, prosperity, quarter)
+	return nil
 }
 
 func settleManufacturing(c *domain.Company, cfg IndustryConfig, prosperity float64, quarter int, marketing bool) error {
-	result := SettleManufacturing(
-		c.ID,
-		c.Employees,
-		c.CapCount,
-		c.Inventory,
-		c.Demand,
-		prosperity,
-		quarter,
-		marketing,
-		cfg.CapMaintenanceActive,
-		cfg.CapMaintenanceIdle,
-	)
+		result := SettleManufacturing(
+			c.ID,
+			c.Employees,
+			c.CapCount,
+			c.Inventory,
+			c.Demand,
+			prosperity,
+			quarter,
+			marketing,
+			cfg.BaseMaintenanceRate,
+			cfg.OperationalCostRate,
+		)
 
-	newCash := c.Cash + result.Profit
+	newCash := int64(math.Round(c.Cash)) + result.Profit
 
 	tx := store.DB.Begin()
 
 	if err := tx.Create(&domain.CompanyQuarterly{
-		CompanyID:   c.ID,
-		Quarter:     quarter,
-		Period:      formatPeriod(quarter),
-		Revenue:     result.Revenue,
-		Profit:      result.Profit,
-		Cash:        newCash,
-		Employees:   c.Employees,
-		TotalShares: c.TotalShares,
-		CEOShares:   c.CEOShares,
-		CapCount:    c.CapCount,
-		Inventory:   result.Inventory,
-		Demand:      result.Demand,
+		CompanyID:       c.ID,
+		Quarter:         quarter,
+		Revenue:         result.Revenue,
+		Profit:          result.Profit,
+		Cash:            newCash,
+		LaborCost:       result.LaborCost,
+		BaseMaintenance: result.BaseMaintenance,
+		OperationalCost: result.OperationalCost,
+		WarehouseCost:   result.WarehouseCost,
+		TotalCost:       result.LaborCost + result.BaseMaintenance + result.OperationalCost + result.WarehouseCost,
+		SalesQty:        result.SalesQty,
+		ProdQty:         result.ProdQty,
+		Employees:       c.Employees,
+		TotalShares:     c.TotalShares,
+		CEOShares:       c.CEOShares,
+		CapCount:        c.CapCount,
+		Inventory:       result.Inventory,
+		Demand:          result.Demand,
 	}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
 
 	if err := tx.Model(c).Updates(map[string]interface{}{
-		"cash":      newCash,
+		"cash":      float64(newCash),
 		"inventory": result.Inventory,
 		"demand":    result.Demand,
 		"quarter":   quarter,
@@ -162,59 +164,4 @@ func settleManufacturing(c *domain.Company, cfg IndustryConfig, prosperity float
 	}
 
 	return tx.Commit().Error
-}
-
-func settleAbstract(c *domain.Company, cfg IndustryConfig, prosperity float64, quarter int) error {
-	rng := ManufacturingRNG(c.ID, quarter, "volatility")
-	iv := (rng.Float64()*2 - 1) * cfg.IndividualVolatility
-
-	revenue := float64(c.Employees) * cfg.RevPerEmployee * (prosperity + iv)
-	profit := revenue * 0.25 // simplified 25% profit margin
-
-	newCash := c.Cash + profit
-
-	tx := store.DB.Begin()
-
-	if err := tx.Create(&domain.CompanyQuarterly{
-		CompanyID:   c.ID,
-		Quarter:     quarter,
-		Period:      formatPeriod(quarter),
-		Revenue:     revenue,
-		Profit:      profit,
-		Cash:        newCash,
-		Employees:   c.Employees,
-		TotalShares: c.TotalShares,
-		CEOShares:   c.CEOShares,
-		CapCount:    c.CapCount,
-	}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	if err := tx.Model(c).Updates(map[string]interface{}{
-		"cash":    newCash,
-		"quarter": quarter,
-	}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return tx.Commit().Error
-}
-
-func formatPeriod(q int) string {
-	year := (q-1)/4 + 1
-	qnum := (q-1)%4 + 1
-	switch qnum {
-	case 1:
-		return "Q1"
-	case 2:
-		return "Q2"
-	case 3:
-		return "Q3"
-	case 4:
-		return "Q4"
-	}
-	_ = year
-	return "Q1"
 }

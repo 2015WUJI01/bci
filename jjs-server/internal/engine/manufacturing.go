@@ -40,17 +40,18 @@ func ManufacturingRNG(companyID uint, quarter int, aspect string) *rand.Rand {
 }
 
 type ManufacturingResult struct {
-	ProdQty       float64 // 生产量 (件)
-	SalesQty      float64 // 销售量 (件)
-	Demand        float64 // 当季需求 (件)
-	Revenue       float64 // 营收
-	Inventory     int64   // 季末库存
-	ActiveLines   int     // 使用中产线
-	IdleLines     int     // 闲置产线
-	Maintenance   float64 // 维护费
-	WarehouseCost float64 // 仓储费
-	LaborCost     float64 // 人工
-	Profit        float64 // 净利润
+	ProdQty         int64   // 生产量 (件)
+	SalesQty        int64   // 销售量 (件)
+	Demand          float64 // 当季需求 (件)
+	Revenue         float64 // 营收
+	Inventory       int64   // 季末库存
+	ActiveLines     int     // 使用中产线
+	IdleLines       int     // 闲置产线
+	BaseMaintenance int64   // 基础维护费
+	OperationalCost int64   // 运营成本
+	WarehouseCost   int64   // 仓储费
+	LaborCost       int64   // 人工
+	Profit          int64   // 净利润
 }
 
 func InitialDemand(companyID uint, employees int) float64 {
@@ -70,8 +71,8 @@ func SettleManufacturing(
 	prosperity float64,
 	quarter int,
 	marketing bool,
-	capMaintenanceActive float64,
-	capMaintenanceIdle float64,
+	baseMaintenanceRate int64,
+	operationalCostRate int64,
 ) ManufacturingResult {
 	volatilityRNG := ManufacturingRNG(companyID, quarter, "volatility")
 	iv := (volatilityRNG.Float64()*2 - 1) * 0.10 // ±10%
@@ -112,29 +113,33 @@ func SettleManufacturing(
 	}
 	inventory = math.Round(inventory*100) / 100
 
-	// 维护费
-	maintenance := float64(activeLines)*capMaintenanceActive + float64(idleLines)*capMaintenanceIdle
+	// 基础维护费（全部产线）
+	baseMaintenance := int64(capCount) * baseMaintenanceRate
+
+	// 运营成本（仅开工产线）
+	operationalCost := int64(activeLines) * operationalCostRate
 
 	// 仓储费
-	warehouseCost := math.Round(inventory*mfgWarehouseCostRate*100) / 100
+	warehouseCost := int64(math.Round(inventory * mfgWarehouseCostRate))
 
 	// 人工
-	laborCost := float64(employees) * mfgLaborRate
+	laborCost := int64(employees) * int64(mfgLaborRate)
 
 	// 净利润
-	profit := revenue - laborCost - maintenance - warehouseCost
+	profit := int64(math.Round(revenue)) - laborCost - baseMaintenance - operationalCost - warehouseCost
 
 	return ManufacturingResult{
-		ProdQty:       math.Round(prodQty*100) / 100,
-		SalesQty:      math.Round(salesQty*100) / 100,
-		Demand:        demand,
-		Revenue:       revenue,
-		Inventory:     int64(math.Round(inventory)),
-		ActiveLines:   activeLines,
-		IdleLines:     idleLines,
-		Maintenance:   math.Round(maintenance*100) / 100,
-		WarehouseCost: warehouseCost,
-		LaborCost:     laborCost,
-		Profit:        math.Round(profit*100) / 100,
+		ProdQty:         int64(math.Round(prodQty)),
+		SalesQty:        int64(math.Round(salesQty)),
+		Demand:          demand,
+		Revenue:         revenue,
+		Inventory:       int64(math.Round(inventory)),
+		ActiveLines:     activeLines,
+		IdleLines:       idleLines,
+		BaseMaintenance: baseMaintenance,
+		OperationalCost: operationalCost,
+		WarehouseCost:   warehouseCost,
+		LaborCost:       laborCost,
+		Profit:          profit,
 	}
 }

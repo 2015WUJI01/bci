@@ -1,8 +1,12 @@
 package engine
 
 import (
+	"fmt"
+	"log/slog"
 	"math"
 	"math/rand"
+
+	"jjs-server/internal/store"
 )
 
 func WalkProsperity(oldProsperity float64, cfg IndustryConfig) float64 {
@@ -40,4 +44,26 @@ func WalkProsperity(oldProsperity float64, cfg IndustryConfig) float64 {
 	}
 
 	return newProsperity
+}
+
+func RestoreOrSeedGlobalQuarter() error {
+	maxQ, err := store.MaxProsperityQuarter()
+	if err != nil {
+		return fmt.Errorf("get max prosperity quarter: %w", err)
+	}
+
+	if maxQ == 0 {
+		for id := range Industries {
+			if err := store.SaveProsperity(id, 1, 1.0); err != nil {
+				return fmt.Errorf("save initial prosperity for %s: %w", id, err)
+			}
+		}
+		GlobalQuarter.Store(1)
+		slog.Info("seeded initial prosperity", "quarter", 1)
+	} else {
+		GlobalQuarter.Store(int64(maxQ))
+		slog.Info("restored global quarter from DB", "quarter", maxQ)
+	}
+
+	return nil
 }

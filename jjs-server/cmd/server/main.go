@@ -29,6 +29,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := engine.RestoreOrSeedGlobalQuarter(); err != nil {
+		slog.Error("failed to restore global quarter", "error", err)
+		os.Exit(1)
+	}
+
 	authH := &handler.AuthHandler{}
 	playerH := &handler.PlayerHandler{}
 	companyH := &handler.CompanyHandler{}

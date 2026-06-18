@@ -13,8 +13,8 @@ type IndustryConfig struct {
 	CapBuildCost         float64
 	CapBuildQuarters     int
 	CapSpecial           string
-	CapMaintenanceActive float64
-	CapMaintenanceIdle   float64
+	BaseMaintenanceRate int64
+	OperationalCostRate int64
 	HireCost             float64
 
 	// 景气度游走参数 (中心=1.0)
@@ -56,8 +56,8 @@ var Industries = map[string]IndustryConfig{
 		CapBuildCost:         50000,
 		CapBuildQuarters:     0,
 		CapSpecial:           "depreciate_30pct_5q",
-		CapMaintenanceActive: 2500,
-		CapMaintenanceIdle:   800,
+		BaseMaintenanceRate: 800,
+		OperationalCostRate: 1700,
 		HireCost:             5000,
 		ProsperityMin:        0.65,
 		ProsperityMax:        1.35,
@@ -80,8 +80,8 @@ var Industries = map[string]IndustryConfig{
 		CapBuildCost:         200000,
 		CapBuildQuarters:     3,
 		CapSpecial:           "",
-		CapMaintenanceActive: 6000,
-		CapMaintenanceIdle:   3000,
+		BaseMaintenanceRate: 3000,
+		OperationalCostRate: 3000,
 		HireCost:             3000,
 		ProsperityMin:        0.75,
 		ProsperityMax:        1.25,
@@ -104,8 +104,8 @@ var Industries = map[string]IndustryConfig{
 		CapBuildCost:         80000,
 		CapBuildQuarters:     1,
 		CapSpecial:           "",
-		CapMaintenanceActive: 3000,
-		CapMaintenanceIdle:   1000,
+		BaseMaintenanceRate: 1000,
+		OperationalCostRate: 2000,
 		HireCost:             3000,
 		ProsperityMin:        0.80,
 		ProsperityMax:        1.20,
@@ -128,8 +128,8 @@ var Industries = map[string]IndustryConfig{
 		CapBuildCost:         120000,
 		CapBuildQuarters:     2,
 		CapSpecial:           "deplete_20q",
-		CapMaintenanceActive: 4000,
-		CapMaintenanceIdle:   1500,
+		BaseMaintenanceRate: 1500,
+		OperationalCostRate: 2500,
 		HireCost:             3000,
 		ProsperityMin:        0.72,
 		ProsperityMax:        1.28,
@@ -152,8 +152,8 @@ var Industries = map[string]IndustryConfig{
 		CapBuildCost:         60000,
 		CapBuildQuarters:     1,
 		CapSpecial:           "",
-		CapMaintenanceActive: 3000,
-		CapMaintenanceIdle:   1500,
+		BaseMaintenanceRate: 1500,
+		OperationalCostRate: 1500,
 		HireCost:             3000,
 		ProsperityMin:        0.88,
 		ProsperityMax:        1.12,
@@ -176,8 +176,8 @@ var Industries = map[string]IndustryConfig{
 		CapBuildCost:         150000,
 		CapBuildQuarters:     2,
 		CapSpecial:           "random_output",
-		CapMaintenanceActive: 5000,
-		CapMaintenanceIdle:   2000,
+		BaseMaintenanceRate: 2000,
+		OperationalCostRate: 3000,
 		HireCost:             3000,
 		ProsperityMin:        0.88,
 		ProsperityMax:        1.16,

@@ -11,6 +11,7 @@ import { MarketPage } from '@/pages/MarketPage'
 import { PortfolioPage } from '@/pages/PortfolioPage'
 import { TradePage } from '@/pages/TradePage'
 import { CompanyPage } from '@/pages/CompanyPage'
+import { QuarterlyPage } from '@/pages/QuarterlyPage'
 import { LeaderboardPage } from '@/pages/LeaderboardPage'
 
 const rootRoute = createRootRoute()
@@ -68,6 +69,12 @@ const companyRoute = createRoute({
   component: CompanyPage,
 })
 
+const quarterlyRoute = createRoute({
+  getParentRoute: () => gameRoute,
+  path: '/company/quarterly',
+  component: QuarterlyPage,
+})
+
 const leaderboardRoute = createRoute({
   getParentRoute: () => gameRoute,
   path: '/leaderboard',
@@ -82,6 +89,7 @@ const routeTree = rootRoute.addChildren([
     portfolioRoute,
     tradeRoute,
     companyRoute,
+    quarterlyRoute,
     leaderboardRoute,
   ]),
 ])

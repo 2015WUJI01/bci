@@ -187,11 +187,10 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	q0 := &domain.CompanyQuarterly{
 		CompanyID:   company.ID,
-		Quarter:     0,
-		Period:      "Q0",
+		Quarter:     int(engine.GlobalQuarter.Load()),
 		Revenue:     0,
 		Profit:      0,
-		Cash:        companyCash,
+		Cash:        int64(companyCash),
 		Employees:   ind.StartingEmployees,
 		TotalShares: req.TotalShares,
 		CEOShares:   ceoShares,
@@ -214,6 +213,27 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CEOShares:   company.CEOShares,
 		OwnRatio:    ownRatio,
 	})
+}
+
+func (h *CompanyHandler) Quarterly(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		WriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "未登录"})
+		return
+	}
+
+	company, err := store.GetActiveCompanyByCEOID(userID)
+	if err != nil {
+		WriteJSON(w, http.StatusOK, []domain.CompanyQuarterly{})
+		return
+	}
+
+	quarterly, err := store.GetQuarterlyByCompanyID(company.ID)
+	if err != nil {
+		quarterly = []domain.CompanyQuarterly{}
+	}
+
+	WriteJSON(w, http.StatusOK, quarterly)
 }
 
 func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
@@ -240,13 +260,12 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		pendingCount = len(pendingOrders)
 	}
 
-	var revenue, profit float64
+	var revenue float64
+	var profit int64
 	if len(quarterly) > 0 {
 		last := quarterly[len(quarterly)-1]
-		if last.Quarter > 0 {
-			revenue = last.Revenue
-			profit = last.Profit
-		}
+		revenue = last.Revenue
+		profit = last.Profit
 	}
 
 	ownRatio := float64(10000) / float64(company.TotalShares)
@@ -271,7 +290,7 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		CapacityCeiling: capacityCeiling,
 		ActualOutput:    actualOutput,
 		Revenue:         int64(revenue),
-		Profit:          int64(profit),
+		Profit:          profit,
 		Quarterly:       quarterly,
 		PendingBuilds:   pendingCount,
 	})
