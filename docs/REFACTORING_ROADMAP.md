@@ -154,7 +154,7 @@ jjs-web/                # 前端源码目录
 **jjs-server（全部完成）**：
 - Go 项目初始化，依赖齐全（chi / gorm + mysql / golang-jwt / bcrypt / envconfig / slog）
 - `config.go`：完整迁移旧版常量 + env + config.json 三层配置合并
-- `models.go`：7 个 GORM 模型定义完备（含 v2 公司字段：AP、董事会、研发、KPI、冷却、流通股等）
+- `models.go`：7 个 GORM 模型定义（公司 v2 字段已全部移除，保留极简骨架：CEOID/Name/Industry/Cash/Employees/Quarter/Status）
 - `store/`：GORM+MySQL 连接池 + AutoMigrate 自动建表 + 用户 CRUD（bcrypt）
 - `handler/`：注册/登录/Me 端点，JWT HS256 签发，bcrypt 密码校验
 - `middleware/`：JWT 鉴权 + 可选鉴权 + CORS + 前端静态文件 SPA fallback
@@ -164,10 +164,10 @@ jjs-web/                # 前端源码目录
 - Vite + React 18 + TypeScript + Tailwind CSS + Zustand + TanStack Query 全部就位
 - authStore（persist to localStorage）+ gameStore（WS 数据 + UI 状态）
 - ApiClient（auto-attach JWT, 401 auto-logout）+ WsClient（exponential backoff reconnect）
-- 11 个 TanStack Query hooks 已定义（对接 P2-P6 后端端点，仅骨架；enable 条件控制）
+- 多个 TanStack Query hooks 已定义
 - AuthPage：登录/注册双 Tab，错误处理，loading 状态
 - GamePage：两栏布局 + 浮动面板系统骨架
-- 完整的 TS 类型定义（35+ 接口，对齐 v2 领域模型）
+- 完整的 TS 类型定义（CompanyState/QuarterlyReport 已精简为极简字段，去掉 v2 预留类型）
 
 **P1 遗留事项（不阻塞 P2，可在后续顺手修复）**：
 - ESLint 配置缺失（ESLint v9 需要 `eslint.config.js`，当前无配置文件，`pnpm lint` 报错）
@@ -176,128 +176,76 @@ jjs-web/                # 前端源码目录
 
 ---
 
-## P2: 公司运营 v2 + 个人资产 (7-9 天)
+## P2: 公司运营 (7-9 天)
 
-> **目标**: 按照 `COMPANY_V2_DESIGN.md` 实现新版公司经营系统（行动点数制）和玩家资产管理。这是整个游戏的基石——股票由公司发行，股价由公司基本面驱动，交易必须建立在公司系统之上。
+> **目标**: 从极简公司骨架开始，逐阶段构建公司经营系统（创建 → 季度结算 → 破产清算）。
 >
-> **⚠️ 直接按 v2 设计实现，不实现 v1 旧版公司系统。**
+> **策略变更**: 不要一次做太多。先搭好公司基础生命周期，AP/董事会/KPI/研发等字段在实现对应功能时按需添加到 `Company` 表，不预留未使用的字段。
 
 ### 参考文档
 
 | 文件 | 用途 |
 |------|------|
-| `COMPANY_V2_DESIGN.md` | **v2 完整设计（十五章节，数值已验证）** |
-| `simulate_v2.py` | 数值模拟脚本（16 组 × 20 季度蒙特卡洛） |
+| `COMPANY_V2_DESIGN.md` | v2 完整设计（各阶段组件参考，非一次性实现） |
+| `simulate_v2.py` | 数值模拟脚本 |
 | `backend/company_engine.py` | v1 公司季度结算（仅参考流程结构） |
-| `backend/industry_config.py` | v1 行业分类（v2 会完全重构） |
-| `backend/models.py` → Company | v1 数据模型（v2 新增大量字段） |
+| `backend/industry_config.py` | v1 行业分类 |
 
-### v2 设计概览
+### Company 当前骨架（P1 清理后）
+
+```go
+type Company struct {
+    gorm.Model
+    CEOID     string    // 当前CEO，非唯一（玩家可离职/被踢）
+    Name      string    // 公司名
+    Industry  string    // 行业
+    Cash      float64   // 现金
+    Employees int       // 员工数
+    Quarter   int       // 当前季度
+    Status    string    // active | bankrupt
+}
+
+type CompanyQuarterly struct {
+    ID, CompanyID
+    Quarter, Period
+    Revenue, Profit, Cash, Employees
+    CreatedAt
+}
+```
+
+后续每加一个功能（AP、董事会、研发等），只往 `Company` 表加 1-2 个字段。
+
+### P2.1: 行业配置与公司创建 (1.5 天)
 
 ```
-每季度 = 5 分钟 = 3 点行动力 (AP)
-
-经营类 [1AP]:    扩产 / 招人 / 研发 / 降本 / 促销
-资本类 [0AP]:    分红 / 回购 / 营销     ← 不耗 AP，只耗现金
-战略类 [2-3AP]:  并购(2AP) / 转型(3AP)
-纯现金:          增发 (不耗 AP，永久一次)
-
-董事会满意度 (0-100): 年度 KPI 考核，2 年保护期，罢免线 < 20
-行业三维模型:         天花板 / 驱动力 / 淤积（6 行业各有独特表现）
-研发系统:             成本指数递增（¥20k → ¥30k → ¥45k → ...）
-随机事件池:           14 个事件，30% 触发概率
-简化股价公式:         股价 = (EPS × 行业PE) × 周期系数 × 市场情绪
-```
-
-### P2.1: 行业与公司模型 (1.5 天)
-
-```
-internal/engine/company/
-├── industry.go                    # 行业配置
+internal/engine/
+├── industry.go                    # 行业配置（6 行业参数）
+├── company.go                     # 创建 + 季度结算 + 破产逻辑
 ```
 
 **行业配置**:
 - 6 个行业: 科技 / 金融 / 制造 / 能源 / 消费 / 医疗
-- 行业基础参数: PE、人均营收/季、起始员工、起始现金、总股本
-- 行业独有行动定义
-- 行业三维模型参数（天花板/驱动力/淤积的具体名称和数值）
-- 周期系数（繁荣 1.3 / 正常 1.0 / 衰退 0.7）
+- 基础参数: PE、人均营收/季、起始现金、起始员工
 
-### P2.2: AP 行动系统 (2 天)
+**公司创建** (POST /api/company/create):
+- 选择行业 → 按行业初始参数写入 Company 表
+- CEOID = 当前玩家 ID，Status = active
+- 限制：同一玩家只能同时经营一家活跃公司
 
-```
-internal/engine/company/
-├── actions.go                     # 行动定义 + 执行引擎
-```
+**季度结算** (每 tick 触发):
+- 计算 Revenue = Employees × 人均产出 (从行业配置读取)
+- 计算 Profit = Revenue - (Employees × 工资) - 固定成本
+- 写入 CompanyQuarterly 快照
 
-**17 个行动**:
-- 经营类 5 个 (1AP): 扩产、招人、研发、降本、促销
-- 资本类 3 个 (0AP): 分红、回购、营销
-- 战略类 3 个: 并购(2AP, CD 4Q)、转型(3AP, CD 8Q)、增发(现金, 永久一次)
-- 行业专属 6 个 (1-2AP): 产品发布、杠杆投资、加班赶工、囤积资源、开店扩张、加速临床
+**破产判定**:
+- Cash < 0 连续 2 季度 → Status = bankrupt
+- CEOID 清空，玩家可重新创建公司
 
-**实现要点**:
-- 行动效果/成本/冷却/约束全部配置化（参考 `COMPANY_V2_DESIGN.md` 第四、六章）
-- 行业差异表（如制造扩产 +25% vs 科技 +15%）
-- 并购递减机制（每次使用员工增幅 -5%，最低 10%）
-- 利润率上限 80%
-
-### P2.3: 董事会与 KPI 系统 (1 天)
+### P2.2: AP 行动系统（待 Company 表加 AP/APCap 字段时实现）
 
 ```
-internal/engine/company/
-├── board.go                       # 董事会满意度 + 年度 KPI 考核
+行动点系统 + 董事会/KPI + 研发 + 随机事件 —— 后续按需逐阶段实现
 ```
-
-**实现要点**:
-- 满意度 (0-100)，日常波动规则（见设计文档 5.3 节）
-- 5 种 KPI: 股价涨幅 / 营收增长 / 利润率 / 分红总额 / 员工规模
-- 年度考核（每 4 季度）：≥70 满意 / 40-69 警告 / <40 不满
-- 2 年保护期（前 8 季度不扣满意度）
-- 满意度 < 20 直接罢免
-- AP 上限从 3 起，年度通过 +1（最高 5）
-
-### P2.4: 研发与随机事件 (1 天)
-
-```
-internal/engine/company/
-├── research.go                    # 研发系统
-├── events.go                      # 随机事件池
-```
-
-**研发系统**:
-- [1AP, 成本指数递增] → 技术等级 +1 → 永久生效
-- 各行业研发产出不同（降低运营惩罚，而非直接提升利润率）
-- 科技/医疗 研发享受 1.5 倍效果
-
-**随机事件**:
-- 14 个事件池，每季度 30% 概率触发
-- 事件效果覆盖: 政策利好、原材料涨价、竞品冲击、技术突破等
-
-### P2.5: 季度结算引擎 (1.5 天)
-
-```
-internal/engine/company/
-├── engine.go                      # CompanyState + 季度结算主流程
-├── price.go                       # v2 简化股价公式
-```
-
-**季度结算流程** (参考设计文档第九章):
-1. 经营报表生成（上季度决策生效）
-2. 随机事件（30% 概率）
-3. 决策阶段（玩家分配 AP，可跳过）
-4. 决策执行（立即生效）
-5. 季度公告（广播财报；年度末考核 KPI）
-
-**简化股价公式**:
-```
-净利润 = 营收 × 利润率
-EPS = 净利润 / 总股本
-股价 = (EPS × 行业PE) × 周期系数 × 市场情绪
-```
-去掉了 NAV 影响——股价只看公司赚不赚钱 + 市场估值。
-
-### P2.6: 个人资产系统 (1 天)
 
 ```
 internal/store/

@@ -112,38 +112,14 @@ export interface PendingOrder {
 
 export interface CompanyState {
   id: string
-  symbol: string
   name: string
   industry: Industry
   ceo: string
-  tick: number
   quarter: number
-  stockPrice: number
-  marketCap: number
   cash: number
   revenue: number
   profit: number
-  profitMargin: number
   employees: number
-  techLevel: number
-  sharesOutstanding: number
-  eps: number
-  pe: number
-  ap: number
-  maxAp: number
-  boardSatisfaction: number
-  kpi: KPIState
-  cycle: 'boom' | 'normal' | 'recession'
-  marketSentiment: number
-  actions: ActionDefinition[]
-}
-
-export interface KPIState {
-  stockGrowth: { current: number; target: number; met: boolean }
-  revenueGrowth: { current: number; target: number; met: boolean }
-  profitMargin: { current: number; target: number; met: boolean }
-  dividendTotal: { current: number; target: number; met: boolean }
-  employeeCount: { current: number; target: number; met: boolean }
 }
 
 export type Industry = 'tech' | 'finance' | 'manufacturing' | 'energy' | 'consumer' | 'healthcare'
@@ -160,31 +136,12 @@ export interface IndustryInfo {
   sharesOutstanding: number
 }
 
-export interface ActionDefinition {
-  id: string
-  name: string
-  category: 'operation' | 'capital' | 'strategic' | 'industry_specific'
-  apCost: number
-  cashCost: number
-  cooldown: number
-  cooldownRemaining: number
-  maxUses: number | null
-  usesRemaining: number | null
-  description: string
-  available: boolean
-}
-
 export interface QuarterlyReport {
   quarter: number
   revenue: number
   profit: number
-  profitMargin: number
-  eps: number
-  stockPrice: number
-  employees: number
-  techLevel: number
   cash: number
-  events: string[]
+  employees: number
 }
 
 export interface RandomEvent {

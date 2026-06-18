@@ -48,65 +48,25 @@ type Holding struct {
 
 type Company struct {
 	gorm.Model
-	PlayerID string `gorm:"type:varchar(12);uniqueIndex;not null"`
-	Name     string `gorm:"type:varchar(50);not null"`
-	Symbol   string `gorm:"type:varchar(10);unique;not null"`
-	Industry string `gorm:"type:varchar(20);not null;index:idx_company_industry"`
-
-	Cash             float64 `gorm:"not null;default:100000"`
-	TotalAssets      float64 `gorm:"not null;default:100000"`
-	Revenue          float64 `gorm:"not null;default:0"`
-	Profit           float64 `gorm:"not null;default:0"`
-	Employees        int     `gorm:"not null;default:10"`
-	Quarter          int     `gorm:"not null;default:1"`
-	SharePrice       float64 `gorm:"not null;default:10"`
-	SharesOutstanding int64  `gorm:"not null;default:10000000"`
-
-	TechPoints      float64 `gorm:"not null;default:0"`
-	CurrentStrategy string  `gorm:"type:varchar(20);not null;default:'balanced'"`
-	AllocPcts       string  `gorm:"type:varchar(200);not null;default:'{\"reserve\":25,\"sales\":25,\"dividend\":25,\"research\":25}'"`
-
-	// --- v2 fields (P2 启用) ---
-
-	AP    int `gorm:"not null;default:3"`
-	APCap int `gorm:"not null;default:3"`
-
-	BoardSatisfaction  float64 `gorm:"not null;default:50"`
-	KpiType            string  `gorm:"type:varchar(20);default:''"`
-	KpiTarget          float64 `gorm:"not null;default:0"`
-	ProtectionQuarters int     `gorm:"not null;default:8"`
-
-	TechLevel       int    `gorm:"not null;default:0"`
-	ActionCooldowns string `gorm:"type:text"`
-	MergerCount     int    `gorm:"not null;default:0"`
-	SharesIssued    bool   `gorm:"not null;default:false"`
-
-	IndustryCycle string `gorm:"type:varchar(10);not null;default:'normal'"`
+	CEOID     string `gorm:"type:varchar(12);index;not null"`
+	Name      string `gorm:"type:varchar(50);not null"`
+	Industry  string `gorm:"type:varchar(20);not null;index:idx_company_industry"`
+	Cash      float64 `gorm:"not null;default:0"`
+	Employees int    `gorm:"not null;default:0"`
+	Quarter   int    `gorm:"not null;default:1"`
+	Status    string `gorm:"type:varchar(20);not null;default:'active'"`
 }
 
 type CompanyQuarterly struct {
-	ID           uint      `gorm:"primaryKey;autoIncrement"`
-	CompanyID    uint      `gorm:"index;not null"`
-	Quarter      int       `gorm:"not null"`
-	Period       string    `gorm:"type:varchar(20);not null"`
-	Revenue      float64   `gorm:"not null;default:0"`
-	Profit       float64   `gorm:"not null;default:0"`
-	Assets       float64   `gorm:"not null;default:0"`
-	Cash         float64   `gorm:"not null;default:0"`
-	Employees    int       `gorm:"not null;default:0"`
-	SharePrice   float64   `gorm:"not null;default:0"`
-	SalaryCost   float64   `gorm:"not null;default:0"`
-	RdSpend      float64   `gorm:"not null;default:0"`
-	FixedCost    float64   `gorm:"not null;default:0"`
-	DividendPaid float64   `gorm:"not null;default:0"`
-	IndustryCycle string  `gorm:"type:varchar(10);not null;default:'normal'"`
-	PrevRevenue  float64   `gorm:"not null;default:0"`
-	PrevProfit   float64   `gorm:"not null;default:0"`
-	CycleMult    float64   `gorm:"not null;default:1"`
-	BaseRevenue  float64   `gorm:"not null;default:0"`
-	InterestIncome float64 `gorm:"not null;default:0"`
-	MarketCondition float64 `gorm:"not null;default:0"`
-	CreatedAt    time.Time `gorm:"autoCreateTime"`
+	ID        uint      `gorm:"primaryKey;autoIncrement"`
+	CompanyID uint      `gorm:"index;not null"`
+	Quarter   int       `gorm:"not null"`
+	Period    string    `gorm:"type:varchar(20);not null"`
+	Revenue   float64   `gorm:"not null;default:0"`
+	Profit    float64   `gorm:"not null;default:0"`
+	Cash      float64   `gorm:"not null;default:0"`
+	Employees int       `gorm:"not null;default:0"`
+	CreatedAt time.Time `gorm:"autoCreateTime"`
 }
 
 type AssetLog struct {

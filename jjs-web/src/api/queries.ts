@@ -80,7 +80,7 @@ export function useQuarterlyReports() {
 }
 
 export function useBoardState() {
-  return useQuery<{ satisfaction: number; kpi: unknown; ap: number; maxAp: number }>({
+  return useQuery<{ satisfaction: number }>({
     queryKey: companyKeys.board,
     queryFn: () => api.get('/company/v2/board'),
   })

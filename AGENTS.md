@@ -5,7 +5,7 @@
 - **Legacy (do not modify)**: `backend/` (Python+FastAPI+SQLite) and `frontend/` (vanilla JS). These are dead code for reference only.
 - **New backend**: `jjs-server/` — Go 1.24, chi router, GORM+MySQL, JWT+bcrypt.
 - **New frontend**: `jjs-web/` — React 18 + TypeScript + Vite + Tailwind CSS + Zustand + TanStack Query/Router.
-- **Rewrite plan**: `docs/REFACTORING_ROADMAP.md` — 8 phases. Currently at P1 (skeleton: auth works on both sides), P2-P8 not started.
+- **Rewrite plan**: `docs/REFACTORING_ROADMAP.md` — 8 phases. Currently at P2 start (lean Company skeleton, auth works).
 
 ## Development commands
 
