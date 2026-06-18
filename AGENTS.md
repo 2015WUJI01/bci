@@ -7,6 +7,28 @@
 - **New frontend**: `jjs-web/` — React 18 + TypeScript + Vite + Tailwind CSS + Zustand + TanStack Query/Router + 底部 Dock 导航。
 - **Rewrite plan**: `docs/REFACTORING_ROADMAP.md` — 8 phases. Currently at P2 start (路由/Dock 已完成，Auth 可用，5 条游戏路由就绪)。
 
+## AI Agent Workflow Rules
+
+### Before starting any task
+
+**MUST read relevant documentation before planning or coding.** Skipping this step leads to misunderstandings about the current project state.
+
+1. **Always** read `docs/REFACTORING_ROADMAP.md` first — check the current phase, what's completed (✅) and what's pending (⏳).
+2. Read design docs relevant to the task domain:
+   - Company/operations → `docs/COMPANY_V2_DESIGN.md`
+   - UI/styling → `docs/UI_STYLE_GUIDE.md`
+   - Architecture overview → `docs/ARCHITECTURE.md`
+   - Game mechanics → `docs/GAME_DESIGN.md`
+3. After reading docs, inspect the actual code in relevant packages (`jjs-server/internal/`, `jjs-web/src/`) — the docs may be stale and code is the source of truth.
+
+### After completing a task
+
+**MUST ask the user whether to update documentation.** Design changes and progress often need to be synced back to keep docs aligned with reality.
+
+1. If new features, APIs, models, or behavioral changes were introduced, ask whether `docs/REFACTORING_ROADMAP.md` should add new subtasks or mark existing ones as completed (✅).
+2. If route/layout/component conventions changed, ask whether relevant design docs (`UI_STYLE_GUIDE.md`, `ARCHITECTURE.md`, etc.) need updating.
+3. If the implementation diverged from the roadmap plan (e.g., different approach, skipped step), proactively note the discrepancy and suggest syncing it into the docs.
+
 ## Development commands
 
 All commands run from the package subdirectory, not from repo root.
