@@ -1,13 +1,6 @@
-import { useAuthStore } from '@/stores/authStore'
-import { AuthPage } from '@/pages/AuthPage'
-import { GamePage } from '@/pages/GamePage'
+import { RouterProvider } from '@tanstack/react-router'
+import { router } from '@/router'
 
 export function App() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-
-  if (!isAuthenticated) {
-    return <AuthPage />
-  }
-
-  return <GamePage />
+  return <RouterProvider router={router} />
 }

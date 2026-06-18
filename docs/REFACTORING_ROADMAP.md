@@ -166,12 +166,15 @@ jjs-web/                # 前端源码目录
 - ApiClient（auto-attach JWT, 401 auto-logout）+ WsClient（exponential backoff reconnect）
 - 多个 TanStack Query hooks 已定义
 - AuthPage：登录/注册双 Tab，错误处理，loading 状态
-- GamePage：两栏布局 + 浮动面板系统骨架
+- GamePage：拆分为 GameLayout + 5 个路由页面，底部 Dock 导航（市场/持仓/交易/公司/排行）
+- 浮动面板系统已移除，全部迁入路由页面
+- TanStack Router 已接入并驱动所有导航，auth guard 在 beforeLoad 中实现
+- Header 响应式适配（sm/md 三档），退出按钮移入昵称下拉菜单
 - 完整的 TS 类型定义（CompanyState/QuarterlyReport 已精简为极简字段，去掉 v2 预留类型）
 
 **P1 遗留事项（不阻塞 P2，可在后续顺手修复）**：
 - ESLint 配置缺失（ESLint v9 需要 `eslint.config.js`，当前无配置文件，`pnpm lint` 报错）
-- TanStack Router 已安装但未使用——当前仅 2 页，用简单条件渲染替代路由；P7 阶段再接入
+- ~~TanStack Router 已安装但未使用——当前仅 2 页，用简单条件渲染替代路由；P7 阶段再接入~~ ✅ 已接入 (2026-06-18)
 - ~~Header 现金显示为硬编码 `¥--`——等待 P2 个人资产系统接入后替换~~ ✅ 已修复 (2026-06-18)
 
 ---

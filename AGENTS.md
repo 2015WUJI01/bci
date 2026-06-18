@@ -4,8 +4,8 @@
 
 - **Legacy (do not modify)**: `backend/` (Python+FastAPI+SQLite) and `frontend/` (vanilla JS). These are dead code for reference only.
 - **New backend**: `jjs-server/` — Go 1.24, chi router, GORM+MySQL, JWT+bcrypt.
-- **New frontend**: `jjs-web/` — React 18 + TypeScript + Vite + Tailwind CSS + Zustand + TanStack Query/Router.
-- **Rewrite plan**: `docs/REFACTORING_ROADMAP.md` — 8 phases. Currently at P2 start (lean Company skeleton, auth works).
+- **New frontend**: `jjs-web/` — React 18 + TypeScript + Vite + Tailwind CSS + Zustand + TanStack Query/Router + 底部 Dock 导航。
+- **Rewrite plan**: `docs/REFACTORING_ROADMAP.md` — 8 phases. Currently at P2 start (路由/Dock 已完成，Auth 可用，5 条游戏路由就绪)。
 
 ## Development commands
 
@@ -72,7 +72,7 @@ Game constants (tick intervals, prices, tax rates, etc.) are hardcoded in `inter
 │   ├── internal/     # config, domain, store, handler, middleware
 │   └── web/          # Target for frontend build output (SPA serving)
 ├── jjs-web/          # NEW React frontend — active development
-│   └── src/          # api/, stores/, pages/, components/, types/
+│   └── src/          # api/, router.tsx, stores/, pages/, components/, types/
 ├── simulate_v2.py    # Monte Carlo validation for v2 economics
 └── stock_game.db     # Legacy SQLite DB (gitignored, not used by new code)
 ```
@@ -83,3 +83,6 @@ Game constants (tick intervals, prices, tax rates, etc.) are hardcoded in `inter
 - `jjs-server/config.json` is gitignored. You must create it manually for local dev. Look at `bin/config.json` for the real-world format (contains production DB credentials — do not commit).
 - `stock_game.db` is gitignored and belongs to the legacy Python backend. The new Go backend uses MySQL exclusively.
 - Legacy `game_engine.py` is a 3370-line god module — the rewrite intentionally splits this into separate Go packages.
+- **Routing**: `@tanstack/react-router` drives all navigation (no hash routing). `/login` for auth, `/game/*` for the game (5 routes: market/portfolio/trade/company/leaderboard). Auth guard in `beforeLoad` redirects to `/login`.
+- **Layout**: `GameLayout` wraps all game pages with persistent Header + `<Outlet />` + 底部 Dock。Dock 5 个 Tab 导航，激活项蓝色高亮。浮动面板系统已移除，所有面板内容迁入路由页面。
+- **Header 响应式**: 三档断点 (sm/md)，窄屏隐藏标语/在线人数/延迟/昵称，退出在昵称下拉菜单中。

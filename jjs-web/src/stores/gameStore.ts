@@ -65,11 +65,11 @@ export const useGameStore = create<GameState>()((set) => ({
   klineData: {},
 
   panels: {
-    trade: true,
-    orderBook: true,
-    tradeTape: true,
-    news: true,
-    leaderboard: true,
+    trade: false,
+    orderBook: false,
+    tradeTape: false,
+    news: false,
+    leaderboard: false,
     company: false,
     admin: false,
     margin: false,
