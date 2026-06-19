@@ -22,8 +22,8 @@ type Transaction struct {
 	Symbol    string    `gorm:"type:varchar(10);not null"`
 	TradeType string    `gorm:"type:varchar(10);not null;check:trade_type IN ('buy','sell','short_sell','cover')"`
 	Quantity  int64     `gorm:"not null"`
-	Price     float64   `gorm:"not null"`
-	Total     float64   `gorm:"not null"`
+	Price     int64     `gorm:"not null"`
+	Total     int64     `gorm:"not null"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 }
 
@@ -40,10 +40,10 @@ type Holding struct {
 	PlayerID     string  `gorm:"type:varchar(12);index:idx_holdings_player;not null;uniqueIndex:uq_player_symbol"`
 	Symbol       string  `gorm:"type:varchar(10);not null;uniqueIndex:uq_player_symbol"`
 	Qty          int64   `gorm:"not null;default:0"`
-	AvgCost      float64 `gorm:"not null;default:0"`
+	AvgCost      int64   `gorm:"not null;default:0"`
 	FrozenQty    int64   `gorm:"not null;default:0"`
 	ShortQty     int64   `gorm:"not null;default:0"`
-	ShortAvgCost float64 `gorm:"not null;default:0"`
+	ShortAvgCost int64   `gorm:"not null;default:0"`
 }
 
 type Company struct {
@@ -61,7 +61,7 @@ type Company struct {
 	CEOShares   int64   `gorm:"not null;default:0"`
 	CapCount    int     `gorm:"not null;default:0"`
 	Inventory   int64 `gorm:"not null;default:0"`
-	Demand      float64 `gorm:"not null;default:0"`
+	Demand      int64 `gorm:"not null;default:0"`
 }
 
 type CapBuildOrder struct {
@@ -75,7 +75,7 @@ type CompanyQuarterly struct {
 	ID              uint      `json:"ID" gorm:"primaryKey;autoIncrement"`
 	CompanyID       uint      `json:"CompanyID" gorm:"index;not null"`
 	Quarter         int       `json:"quarter" gorm:"not null"`
-	Revenue         float64   `json:"revenue" gorm:"not null;default:0"`
+	Revenue         int64     `json:"revenue" gorm:"not null;default:0"`
 	Profit          int64     `json:"profit" gorm:"not null;default:0"`
 	BeginningCash   int64     `json:"beginning_cash" gorm:"not null;default:0"`
 	Cash            int64     `json:"cash" gorm:"not null;default:0"`
@@ -91,7 +91,7 @@ type CompanyQuarterly struct {
 	CEOShares       int64     `json:"ceo_shares" gorm:"not null;default:0"`
 	CapCount        int       `json:"cap_count" gorm:"not null;default:0"`
 	Inventory       int64     `json:"inventory" gorm:"not null;default:0"`
-	Demand          float64   `json:"demand" gorm:"not null;default:0"`
+	Demand          int64     `json:"demand" gorm:"not null;default:0"`
 	CreatedAt       time.Time `json:"CreatedAt" gorm:"autoCreateTime"`
 }
 type IndustryProsperity struct {

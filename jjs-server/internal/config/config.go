@@ -71,12 +71,12 @@ const (
 	PriceTickInterval     = 1500 * time.Millisecond
 	LeaderboardInterval   = 7500 * time.Millisecond
 	DBFlushInterval       = 30 * time.Second
-	PriceMin              = 0.0001
-	PriceMax              = 1_000_000.0
+	PriceMin              = 1            // 分 (最小股价, 原 0.0001 円)
+	PriceMax              = 100_000_000  // 分 (最大股价, 原 1_000_000 円)
 	SharesOutstanding     = 500_000_000
-	MaxPositionPerPlayer  = SharesOutstanding * 0.05
-	MaxOrderQty           = SharesOutstanding * 0.01
-	InitialPrice          = 100.0
+	MaxPositionPerPlayer  = SharesOutstanding * 5 / 100
+	MaxOrderQty           = SharesOutstanding / 100
+	InitialPrice          = 10000        // 分 (初始股价, 原 100 円)
 
 	StampTaxRate       = 0.001
 	CommissionRate     = 0.00025

@@ -325,7 +325,7 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 	confirmedQuarter := int(engine.GlobalQuarter.Load()) - 1
 	filtered := filteredQuarterly(quarterly)
 	var lastQ *domain.CompanyQuarterly
-	var revenue float64
+	var revenue int64
 	var profit int64
 	for i := range filtered {
 		if filtered[i].Quarter == confirmedQuarter {
@@ -358,7 +358,7 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		Inventory:       company.Inventory,
 		CapacityCeiling: capacityCeiling,
 		ActualOutput:    actualOutput,
-		Revenue:         int64(revenue),
+		Revenue:         revenue,
 		Profit:          profit,
 		LastQuarterly:   lastQ,
 		PendingBuilds:   pendingCount,

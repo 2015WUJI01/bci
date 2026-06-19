@@ -42,8 +42,8 @@ func ManufacturingRNG(companyID uint, quarter int, aspect string) *rand.Rand {
 type ManufacturingResult struct {
 	ProdQty         int64   // 生产量 (件)
 	SalesQty        int64   // 销售量 (件)
-	Demand          float64 // 当季需求 (件)
-	Revenue         float64 // 营收
+	Demand          int64   // 当季需求 (件)
+	Revenue         int64   // 营收 (円)
 	Inventory       int64   // 季末库存
 	ActiveLines     int     // 使用中产线
 	IdleLines       int     // 闲置产线
@@ -54,12 +54,12 @@ type ManufacturingResult struct {
 	Profit          int64   // 净利润
 }
 
-func InitialDemand(companyID uint, employees int) float64 {
+func InitialDemand(companyID uint, employees int) int64 {
 	rng := ManufacturingRNG(companyID, 0, "demand_init")
 
 	baseDemand := float64(employees) * mfgUnitOutput
 	startRatio := 0.5 + rng.Float64()*0.3 // random 50%~80%
-	return math.Round(baseDemand*startRatio*100) / 100
+	return int64(math.Round(baseDemand * startRatio))
 }
 
 func SettleManufacturing(
@@ -67,7 +67,7 @@ func SettleManufacturing(
 	employees int,
 	capCount int,
 	prevInventory int64,
-	prevDemand float64,
+	prevDemand int64,
 	prosperity float64,
 	quarter int,
 	marketing bool,
@@ -77,63 +77,49 @@ func SettleManufacturing(
 	volatilityRNG := ManufacturingRNG(companyID, quarter, "volatility")
 	iv := (volatilityRNG.Float64()*2 - 1) * 0.10 // ±10%
 
-	// 销售单价
 	sellingPrice := mfgUnitPrice * math.Pow(prosperity, 0.6)
 
-	// 当季需求: 上季需求 × (景气度 + 个体波动) + 营销
-	demand := prevDemand * (prosperity + iv)
+	prevD := float64(prevDemand)
+	demand := prevD * (prosperity + iv)
 
 	if marketing {
 		marketingRNG := ManufacturingRNG(companyID, quarter, "marketing")
 		marketingEffect := marketingRNG.Float64()*(mfgMarketingMax-mfgMarketingMin) + mfgMarketingMin
 		demand += marketingEffect
 	}
-	demand = math.Round(math.Max(demand, 0)*100) / 100
+	demandInt := int64(math.Round(math.Max(demand, 0)))
 
-	// 生产量
 	maxWorkerOutput := float64(employees) * mfgUnitOutput
 	maxLineOutput := float64(capCount) * mfgLineCeiling
 	prodQty := math.Min(maxWorkerOutput, maxLineOutput)
 
-	// 确定使用中/闲置产线
 	linesNeeded := math.Ceil(maxWorkerOutput / mfgLineCeiling)
 	activeLines := int(math.Min(linesNeeded, float64(capCount)))
 	idleLines := capCount - activeLines
 
-	// 销售量: 先清库存再售新品
-	salesQty := math.Min(prodQty+float64(prevInventory), demand)
+	salesQty := math.Min(prodQty+float64(prevInventory), float64(demandInt))
 
-	// 营收
-	revenue := math.Round(salesQty*sellingPrice*100) / 100
+	revenue := int64(math.Round(salesQty * sellingPrice))
 
-	// 季末库存
 	inventory := float64(prevInventory) + prodQty - salesQty
 	if inventory < 0 {
 		inventory = 0
 	}
-	inventory = math.Round(inventory*100) / 100
+	inventoryInt := int64(math.Round(inventory))
 
-	// 基础维护费（全部产线）
 	baseMaintenance := int64(capCount) * baseMaintenanceRate
-
-	// 运营成本（仅开工产线）
 	operationalCost := int64(activeLines) * operationalCostRate
-
-	// 仓储费
-	warehouseCost := int64(math.Round(inventory * mfgWarehouseCostRate))
-
-	// 人工
+	warehouseCost := int64(math.Round(float64(inventoryInt) * mfgWarehouseCostRate))
 	laborCost := int64(employees) * int64(mfgLaborRate)
 
-	// 净利润
-	profit := int64(math.Round(revenue)) - laborCost - baseMaintenance - operationalCost - warehouseCost
+	profit := revenue - laborCost - baseMaintenance - operationalCost - warehouseCost
 
 	return ManufacturingResult{
 		ProdQty:         int64(math.Round(prodQty)),
 		SalesQty:        int64(math.Round(salesQty)),
-		Demand:          demand,
+		Demand:          demandInt,
 		Revenue:         revenue,
-		Inventory:       int64(math.Round(inventory)),
+		Inventory:       inventoryInt,
 		ActiveLines:     activeLines,
 		IdleLines:       idleLines,
 		BaseMaintenance: baseMaintenance,

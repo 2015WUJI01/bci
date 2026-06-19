@@ -1,12 +1,12 @@
 export interface StockInfo {
   symbol: string
   name: string
-  price: number
+  price: number          // 股价 (分, 显示时 ÷100)
   change: number
   changePercent: number
-  open: number
-  high: number
-  low: number
+  open: number           // 分
+  high: number           // 分
+  low: number            // 分
   volume: number
   pe: number
   marketCap: number
@@ -16,7 +16,7 @@ export interface StockInfo {
 }
 
 export interface OrderBookLevel {
-  price: number
+  price: number  // 分
   qty: number
 }
 
@@ -30,17 +30,17 @@ export interface OrderBook {
 export interface TradeRecord {
   time: string
   symbol: string
-  price: number
+  price: number     // 分
   qty: number
   direction: 'buy' | 'sell'
 }
 
 export interface KlineBar {
   time: string
-  open: number
-  high: number
-  low: number
-  close: number
+  open: number      // 分
+  high: number      // 分
+  low: number       // 分
+  close: number     // 分
   volume: number
 }
 
@@ -48,8 +48,8 @@ export interface Holding {
   symbol: string
   name: string
   qty: number
-  costPrice: number
-  currentPrice: number
+  costPrice: number     // 持仓均价 (円, 整数)
+  currentPrice: number  // 当前价 (分, 显示时 ÷100)
   marketValue: number
   pnl: number
   pnlPercent: number
@@ -104,7 +104,7 @@ export interface PendingOrder {
   symbol: string
   type: 'buy' | 'sell'
   orderType: 'market' | 'limit'
-  price: number | null
+  price: number | null  // 分 (限价单)
   qty: number
   filledQty: number
   status: 'pending' | 'partial' | 'filled' | 'cancelled'
@@ -197,8 +197,8 @@ export interface MarginAccount {
 export interface ShortPosition {
   symbol: string
   qty: number
-  costPrice: number
-  currentPrice: number
+  costPrice: number     // 持仓均价 (円, 整数)
+  currentPrice: number  // 当前价 (分, 显示时 ÷100)
   marketValue: number
   pnl: number
   pnlPercent: number
