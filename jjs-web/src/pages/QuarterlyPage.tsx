@@ -79,10 +79,10 @@ export function QuarterlyPage() {
                 <tr className="text-text-muted border-b border-border sticky top-0 bg-bg-card">
                   <th className="p-2.5 text-left">季度</th>
                   <th className="p-2.5 text-right">营收</th>
+                  <th className="p-2.5 text-right">总支出</th>
                   <th className="p-2.5 text-right">利润</th>
-                  <th className="p-2.5 text-right">总成本</th>
-                  <th className="p-2.5 text-right">期初现金</th>
-                  <th className="p-2.5 text-right">期末现金</th>
+                  <th className="p-2.5 text-right hidden sm:table-cell">期初现金</th>
+                  <th className="p-2.5 text-right hidden sm:table-cell">期末现金</th>
                 </tr>
               </thead>
               <tbody>
@@ -95,12 +95,12 @@ export function QuarterlyPage() {
                     >
                       <td className="p-2.5 text-text-secondary">{formatQuarter(q.quarter)}</td>
                       <td className="p-2.5 text-right text-text-primary">¥{q.revenue.toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-text-primary">¥{q.total_cost.toLocaleString()}</td>
                       <td className={`p-2.5 text-right ${q.profit >= 0 ? 'text-up' : 'text-down'}`}>
                         ¥{q.profit.toLocaleString()}
                       </td>
-                      <td className="p-2.5 text-right text-text-primary">¥{q.total_cost.toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-text-primary">¥{q.beginning_cash.toLocaleString()}</td>
-                      <td className="p-2.5 text-right text-text-primary">¥{q.cash.toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-text-primary hidden sm:table-cell">¥{q.beginning_cash.toLocaleString()}</td>
+                      <td className="p-2.5 text-right text-text-primary hidden sm:table-cell">¥{q.cash.toLocaleString()}</td>
                     </tr>
                   )
                 })}

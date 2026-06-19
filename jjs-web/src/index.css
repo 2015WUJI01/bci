@@ -106,3 +106,11 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

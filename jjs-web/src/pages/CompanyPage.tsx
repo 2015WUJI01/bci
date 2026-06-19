@@ -19,6 +19,17 @@ const TOTAL_SHARES_MIN = 10000
 const TOTAL_SHARES_MAX = 200000
 const INVEST_MIN = 1000
 
+function formatQuarter(q: number) {
+  const year = Math.floor((q - 1) / 4) + 1
+  const qnum = ((q - 1) % 4) + 1
+  return `${year}年第${qnum}季`
+}
+
+function formatRatio(part: number, total: number) {
+  if (!total) return '0%'
+  return `${(part / total * 100).toFixed(0)}%`
+}
+
 export function CompanyPage() {
   const { data: company, isLoading } = useCompanyState()
   const { data: playerInfo } = usePlayerInfo()
@@ -27,6 +38,7 @@ export function CompanyPage() {
   const [totalShares, setTotalShares] = useState(50000)
   const [playerInvestment, setPlayerInvestment] = useState(50000)
   const [creating, setCreating] = useState(false)
+  const [showQuarterly, setShowQuarterly] = useState(false)
   const [error, setError] = useState('')
   const queryClient = useQueryClient()
 
@@ -61,9 +73,28 @@ export function CompanyPage() {
     return (
       <div className="h-full flex items-center justify-center">
         <p className="text-text-muted">加载中...</p>
+    </div>
+  )
+}
+
+function DetailItem({ label, value, positive, hint }: {
+  label: string
+  value: string
+  positive?: boolean
+  hint?: string
+}) {
+  return (
+    <div className="bg-bg-input rounded p-2.5">
+      <div className="text-[11px] text-text-muted">{label}</div>
+      <div className={`text-sm font-semibold mt-0.5 ${
+        positive === undefined ? 'text-text-primary' : positive ? 'text-up' : 'text-down'
+      }`}>
+        {value}
+        {hint && <span className="text-text-muted text-[11px] ml-1.5">({hint})</span>}
       </div>
-    )
-  }
+    </div>
+  )
+}
 
   const hasCompany = company && company.id > 0
 
@@ -217,7 +248,7 @@ export function CompanyPage() {
                 <MetricCard label="生产线" value={`${company.cap_count}条`} />
                 <MetricCard label="员工" value={`${company.employees}人`} />
                 <MetricCard
-                  label="开工产能"
+                  label="有效产能"
                   value={`${company.actual_output.toLocaleString()}件/季`}
                   hint={`员工 ${company.employees}人 × 2,000件/人 = ${company.actual_output.toLocaleString()}件`}
                 />
@@ -249,12 +280,29 @@ export function CompanyPage() {
             </div>
           </Panel>
 
-          <Panel title="财务表现">
+          <Panel
+            title="财务表现"
+            headerAction={
+              confirmedQ ? (
+                <button
+                  onClick={() => setShowQuarterly(true)}
+                  className="text-xs text-accent-blue hover:text-accent-blue/80 transition-colors"
+                >
+                  详情
+                </button>
+              ) : undefined
+            }
+          >
             <div className="p-3 space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <MetricCard label="上季营收" value={`¥${company.revenue.toLocaleString()}`} />
-                <MetricCard label="上季利润" value={`¥${company.profit.toLocaleString()}`} />
-                <MetricCard label="上季总成本" value={confirmedQ ? `¥${confirmedQ.total_cost.toLocaleString()}` : '—'} />
+                <MetricCard label="上季总支出" value={confirmedQ ? `¥${confirmedQ.total_cost.toLocaleString()}` : '—'} />
+                <div className="col-span-2 bg-bg-card rounded p-4 border border-border text-center">
+                  <div className="text-xs text-text-muted">上季利润</div>
+                  <div className={`text-xl font-bold mt-1.5 ${company.profit >= 0 ? 'text-up' : 'text-down'}`}>
+                    ¥{company.profit.toLocaleString()}
+                  </div>
+                </div>
               </div>
               <Link
                 to="/game/company/quarterly"
@@ -264,6 +312,74 @@ export function CompanyPage() {
               </Link>
             </div>
           </Panel>
+
+          {showQuarterly && confirmedQ && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              onClick={() => setShowQuarterly(false)}
+            >
+              <div
+                className="bg-bg-card border border-border rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+                  <h3 className="text-sm font-bold text-text-primary">
+                    {formatQuarter(confirmedQ.quarter)} 财报详情
+                  </h3>
+                  <button
+                    className="text-text-muted hover:text-text-primary transition-colors text-lg leading-none"
+                    onClick={() => setShowQuarterly(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-4 overflow-y-auto scrollbar-hide">
+                  <section>
+                    <div className="text-xs font-semibold text-text-secondary mb-2 tracking-wider">财务摘要</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <DetailItem label="营收" value={`¥${confirmedQ.revenue.toLocaleString()}`} />
+                      <DetailItem label="利润" value={`¥${confirmedQ.profit.toLocaleString()}`} positive={confirmedQ.profit >= 0} />
+                      <DetailItem label="支出" value={`¥${confirmedQ.total_cost.toLocaleString()}`} />
+                      <DetailItem label="期末现金" value={`¥${confirmedQ.cash.toLocaleString()}`} />
+                    </div>
+                  </section>
+
+                  <section>
+                    <div className="text-xs font-semibold text-text-secondary mb-2 tracking-wider">支出明细</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <DetailItem label="人力支出" value={`¥${confirmedQ.labor_cost.toLocaleString()}`} hint={formatRatio(confirmedQ.labor_cost, confirmedQ.total_cost)} />
+                      <DetailItem label="基础维护支出" value={`¥${confirmedQ.base_maintenance.toLocaleString()}`} hint={formatRatio(confirmedQ.base_maintenance, confirmedQ.total_cost)} />
+                      <DetailItem label="运营支出" value={`¥${confirmedQ.operational_cost.toLocaleString()}`} hint={formatRatio(confirmedQ.operational_cost, confirmedQ.total_cost)} />
+                      <DetailItem label="仓储支出" value={`¥${confirmedQ.warehouse_cost.toLocaleString()}`} hint={formatRatio(confirmedQ.warehouse_cost, confirmedQ.total_cost)} />
+                    </div>
+                  </section>
+
+                  <section>
+                    <div className="text-xs font-semibold text-text-secondary mb-2 tracking-wider">运营指标</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <DetailItem label="员工" value={`${confirmedQ.employees}人`} />
+                      <DetailItem label="产线" value={`${confirmedQ.cap_count}条`} />
+                      <DetailItem label="有效产能" value={`${Math.min(confirmedQ.employees * 2000, confirmedQ.cap_count * 10000).toLocaleString()}件/季`} />
+                      <DetailItem label="产能上限" value={`${(confirmedQ.cap_count * 10000).toLocaleString()}件/季`} />
+                      <DetailItem label="产量" value={`${confirmedQ.prod_qty.toLocaleString()}件`} />
+                      <DetailItem label="销量" value={`${confirmedQ.sales_qty.toLocaleString()}件`} />
+                      <DetailItem label="库存变更" value={`${confirmedQ.prod_qty - confirmedQ.sales_qty >= 0 ? '+' : ''}${(confirmedQ.prod_qty - confirmedQ.sales_qty).toLocaleString()}件`} positive={confirmedQ.prod_qty - confirmedQ.sales_qty >= 0} />
+                      <DetailItem label="库存" value={confirmedQ.inventory > 0 ? `${confirmedQ.inventory.toLocaleString()}件` : '—'} />
+                    </div>
+                  </section>
+
+                  <section>
+                    <div className="text-xs font-semibold text-text-secondary mb-2 tracking-wider">股权数据</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <DetailItem label="总股本" value={`${confirmedQ.total_shares.toLocaleString()}股`} />
+                      <DetailItem label="CEO持股" value={`${confirmedQ.ceo_shares.toLocaleString()}股 (${(confirmedQ.ceo_shares / confirmedQ.total_shares * 100).toFixed(0)}%)`} />
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+          )}
 
           {company.pending_builds > 0 && (
             <div className="mt-2 text-xs text-accent-gold">
@@ -276,11 +392,11 @@ export function CompanyPage() {
   )
 }
 
-function MetricCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function MetricCard({ label, value, hint, className, colorClass }: { label: string; value: string; hint?: string; className?: string; colorClass?: string }) {
   return (
-    <div className="bg-bg-card rounded p-2.5 border border-border relative group">
+    <div className={`bg-bg-card rounded p-2.5 border border-border relative group ${className ?? ''}`}>
       <div className="text-[11px] text-text-muted">{label}</div>
-      <div className="text-sm font-semibold text-text-primary mt-0.5">{value}</div>
+      <div className={`text-sm font-semibold mt-0.5 ${colorClass ?? 'text-text-primary'}`}>{value}</div>
       {hint && (
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 bg-bg-input border border-border rounded text-[11px] text-text-secondary whitespace-pre-line leading-relaxed opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 pointer-events-none max-w-[280px] shadow-lg">
           {hint}
