@@ -295,13 +295,13 @@ Profit           = Revenue - TotalCost
 |------|------|------|------|
 | POST | `/api/company/create` | JWT | 创建公司，立即运行首次制造结算（SettleManufacturing），产出首季 CompanyQuarterly + 更新 Company 状态 |
 | GET | `/api/company/state` | JWT | 返回公司完整状态（含已确认季度历史 + 待建造队列），`revenue`/`profit` 取自 `GlobalQuarter-1` |
-| GET | `/api/company/quarterly` | JWT | 返回已确认季度报表（过滤预生成记录，仅 `quarter < GlobalQuarter`） |
+| GET | `/api/company/quarterly` | JWT | 游标分页，返回 `{items, hasMore}`。参数 `?cursor=0&limit=50`，按 quarter DESC 排序，过滤 `quarter>0 AND quarter<GlobalQuarter` |
 | GET | `/api/player/info` | JWT | 返回玩家信息 + `global_quarter` 全局季度数 |
 
 **前端**：
 - `Header.tsx`：展示 `第Y年`（由 `global_quarter` 换算），窄屏隐藏
 - `pages/CompanyPage.tsx`：公司仪表盘——头部不再展示 Q{n}；经营指标产能拆为「开工产能」和「产能上限」两格独立展示，库存格展示上季变更量（±件）；股权结构合并为 2 列（总股本 + CEO持股含占比%）；财务表现移除成本率
-- `pages/QuarterlyPage.tsx`：独立历史报表页（路由 `/game/company/quarterly`），表格列 季度/营收/利润/总成本/期末现金（移除利润率列）；点击行弹出 Modal 详情——财务摘要移除利润率/成本率，运营指标新增库存变更/开工产能/产能上限，股权数据合并持股比例到 CEO持股
+- `pages/QuarterlyPage.tsx`：独立历史报表页（路由 `/game/company/quarterly`），无限极滚动加载（50条/页，scroll 事件触发），表格列 季度/营收/利润/总成本/期初现金/期末现金；表格区内滚动（表头 sticky），页高填满可用空间；点击行弹出 Modal 详情——财务摘要移除利润率/成本率，运营指标新增库存变更/开工产能/产能上限，股权数据合并持股比例到 CEO持股
 - `types/index.ts`：`PlayerBasicInfo` 新增 `global_quarter` 字段
 
 ### P2.2: AP 行动系统（待 Company 表加 AP/APCap 字段时实现）

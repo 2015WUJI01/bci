@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"strconv"
 
 	"jjs-server/internal/domain"
 	"jjs-server/internal/engine"
@@ -270,16 +271,31 @@ func (h *CompanyHandler) Quarterly(w http.ResponseWriter, r *http.Request) {
 
 	company, err := store.GetActiveCompanyByCEOID(userID)
 	if err != nil {
-		WriteJSON(w, http.StatusOK, []domain.CompanyQuarterly{})
+		WriteJSON(w, http.StatusOK, map[string]any{"items": []any{}, "hasMore": false})
 		return
 	}
 
-	quarterly, err := store.GetQuarterlyByCompanyID(company.ID)
+	cursor, _ := strconv.Atoi(r.URL.Query().Get("cursor"))
+	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	if err != nil || limit <= 0 {
+		limit = 50
+	}
+
+	currentQuarter := int(engine.GlobalQuarter.Load())
+	quarterly, err := store.GetPaginatedQuarterly(company.ID, cursor, limit, currentQuarter)
 	if err != nil {
 		quarterly = []domain.CompanyQuarterly{}
 	}
 
-	WriteJSON(w, http.StatusOK, filteredQuarterly(quarterly))
+	hasMore := len(quarterly) > limit
+	if hasMore {
+		quarterly = quarterly[:limit]
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"items":   quarterly,
+		"hasMore": hasMore,
+	})
 }
 
 func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {

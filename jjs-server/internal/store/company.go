@@ -66,6 +66,19 @@ func GetQuarterlyByCompanyID(companyID uint) ([]domain.CompanyQuarterly, error) 
 	return qs, nil
 }
 
+func GetPaginatedQuarterly(companyID uint, cursor, limit, currentQuarter int) ([]domain.CompanyQuarterly, error) {
+	var qs []domain.CompanyQuarterly
+	query := DB.Where("company_id = ? AND quarter > 0 AND quarter < ?", companyID, currentQuarter)
+	if cursor > 0 {
+		query = query.Where("quarter < ?", cursor)
+	}
+	err := query.Order("quarter DESC").Limit(limit + 1).Find(&qs).Error
+	if err != nil {
+		return nil, err
+	}
+	return qs, nil
+}
+
 func CreateCapBuildOrder(o *domain.CapBuildOrder) error {
 	return DB.Create(o).Error
 }

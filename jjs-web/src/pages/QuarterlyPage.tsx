@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuarterlyReports } from '@/api/queries'
 import { Panel } from '@/components/Panel'
@@ -16,8 +16,31 @@ function formatRatio(part: number, total: number) {
 }
 
 export function QuarterlyPage() {
-  const { data: quarterly, isLoading } = useQuarterlyReports()
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useQuarterlyReports()
   const [selected, setSelected] = useState<QuarterlyReport | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container || !hasNextPage || isFetchingNextPage) return
+
+    const handleScroll = () => {
+      if (container.scrollTop === 0) return
+      const { scrollTop, scrollHeight, clientHeight } = container
+      if (scrollHeight - scrollTop - clientHeight < 100) {
+        fetchNextPage()
+      }
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   if (isLoading) {
     return (
@@ -27,11 +50,12 @@ export function QuarterlyPage() {
     )
   }
 
-  const list = (quarterly ?? []).filter(q => q.quarter > 0)
+  const list = data?.pages.flatMap((p) => p.items) ?? []
+  const totalHasMore = data?.pages[data.pages.length - 1]?.hasMore ?? false
 
   return (
     <div className="h-full flex flex-col gap-3">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
         <Link
           to="/game/company"
           className="text-xs text-accent-blue hover:text-accent-blue/80 transition-colors"
@@ -48,11 +72,11 @@ export function QuarterlyPage() {
           </div>
         </Panel>
       ) : (
-        <Panel title={`季度报表 (${list.length} 期)`}>
-          <div className="overflow-x-auto">
+        <Panel title="季度报表" className="flex-1 min-h-0 flex flex-col">
+          <div ref={scrollRef} className="overflow-auto flex-1">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-text-muted border-b border-border">
+                <tr className="text-text-muted border-b border-border sticky top-0 bg-bg-card">
                   <th className="p-2.5 text-left">季度</th>
                   <th className="p-2.5 text-right">营收</th>
                   <th className="p-2.5 text-right">利润</th>
@@ -82,6 +106,14 @@ export function QuarterlyPage() {
                 })}
               </tbody>
             </table>
+            <div className="flex items-center justify-center py-3">
+              {isFetchingNextPage && (
+                <p className="text-text-muted text-xs">加载更多...</p>
+              )}
+              {!totalHasMore && list.length > 0 && (
+                <p className="text-text-muted text-xs">已加载全部</p>
+              )}
+            </div>
           </div>
         </Panel>
       )}

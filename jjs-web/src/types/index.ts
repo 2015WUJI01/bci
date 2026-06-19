@@ -148,6 +148,11 @@ export interface IndustryInfo {
   sharesOutstanding: number
 }
 
+export interface QuarterlyResponse {
+  items: QuarterlyReport[]
+  hasMore: boolean
+}
+
 export interface QuarterlyReport {
   ID: number
   CompanyID: number

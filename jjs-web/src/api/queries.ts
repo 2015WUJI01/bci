@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query'
 import { api } from './client'
 import type {
   StockInfo,
@@ -8,7 +8,7 @@ import type {
   NewsItem,
   PortfolioState,
   CompanyState,
-  QuarterlyReport,
+  QuarterlyResponse,
   PendingOrder,
   IndustryInfo,
   PlayerBasicInfo,
@@ -73,9 +73,18 @@ export function useCompanyState() {
 }
 
 export function useQuarterlyReports() {
-  return useQuery<QuarterlyReport[]>({
+  return useInfiniteQuery<QuarterlyResponse>({
     queryKey: companyKeys.quarterly,
-    queryFn: () => api.get('/company/quarterly'),
+    queryFn: ({ pageParam }) =>
+      api.get(`/company/quarterly?cursor=${pageParam ?? 0}&limit=50`),
+    initialPageParam: 0,
+    staleTime: 30_000,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.hasMore) return undefined
+      const items = lastPage.items
+      if (items.length === 0) return undefined
+      return items[items.length - 1].quarter
+    },
   })
 }
 
