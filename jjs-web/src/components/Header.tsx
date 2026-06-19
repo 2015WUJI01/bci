@@ -43,7 +43,7 @@ export function Header({ cash, nickname: playerNickname, globalQuarter }: Header
         </span>
         {globalQuarter != null && globalQuarter > 0 && (
           <span className="text-xs px-2.5 py-0.5 rounded-xl bg-bg-input text-text-secondary whitespace-nowrap">
-            {Math.floor((globalQuarter - 1) / 4) + 1}年 第{((globalQuarter - 1) % 4) + 1}季
+            {Math.floor((globalQuarter - 1) / 4) + 1}年{((globalQuarter - 1) % 4) + 1}季度
           </span>
         )}
         {tickCountdown > 0 && (

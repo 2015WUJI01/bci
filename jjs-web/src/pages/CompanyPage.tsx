@@ -22,7 +22,7 @@ const INVEST_MIN = 1000
 function formatQuarter(q: number) {
   const year = Math.floor((q - 1) / 4) + 1
   const qnum = ((q - 1) % 4) + 1
-  return `${year}年第${qnum}季`
+  return `${year}年${qnum}季度`
 }
 
 function formatRatio(part: number, total: number) {

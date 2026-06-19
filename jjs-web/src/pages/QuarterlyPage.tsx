@@ -7,7 +7,7 @@ import type { QuarterlyReport } from '@/types'
 function formatQuarter(q: number) {
   const year = Math.floor((q - 1) / 4) + 1
   const qnum = ((q - 1) % 4) + 1
-  return `${year}年第${qnum}季`
+  return `${year}年${qnum}季度`
 }
 
 function formatRatio(part: number, total: number) {
@@ -93,7 +93,7 @@ export function QuarterlyPage() {
                       className="border-b border-border/50 hover:bg-bg-hover cursor-pointer transition-colors"
                       onClick={() => setSelected(q)}
                     >
-                      <td className="p-2.5 text-text-secondary">{formatQuarter(q.quarter)}</td>
+                      <td className="p-2.5 text-text-secondary">Y{Math.floor((q.quarter - 1) / 4) + 1}Q{((q.quarter - 1) % 4) + 1}</td>
                       <td className="p-2.5 text-right text-text-primary">¥{q.revenue.toLocaleString()}</td>
                       <td className="p-2.5 text-right text-text-primary">¥{q.total_cost.toLocaleString()}</td>
                       <td className={`p-2.5 text-right ${q.profit >= 0 ? 'text-up' : 'text-down'}`}>
