@@ -55,7 +55,7 @@ type createCompanyResponse struct {
 		ActualOutput    int64   `json:"actual_output"`
 		Revenue         int64   `json:"revenue"`
 		Profit          int64   `json:"profit"`
-		Quarterly       []domain.CompanyQuarterly `json:"quarterly"`
+		LastQuarterly   *domain.CompanyQuarterly `json:"last_quarterly"`
 		PendingBuilds   int     `json:"pending_builds"`
 	}
 
@@ -324,12 +324,15 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 
 	confirmedQuarter := int(engine.GlobalQuarter.Load()) - 1
 	filtered := filteredQuarterly(quarterly)
+	var lastQ *domain.CompanyQuarterly
 	var revenue float64
 	var profit int64
-	for _, q := range filtered {
-		if q.Quarter == confirmedQuarter {
-			revenue = q.Revenue
-			profit = q.Profit
+	for i := range filtered {
+		if filtered[i].Quarter == confirmedQuarter {
+			copy := filtered[i]
+			lastQ = &copy
+			revenue = copy.Revenue
+			profit = copy.Profit
 			break
 		}
 	}
@@ -357,7 +360,7 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		ActualOutput:    actualOutput,
 		Revenue:         int64(revenue),
 		Profit:          profit,
-		Quarterly:       filtered,
+		LastQuarterly:   lastQ,
 		PendingBuilds:   pendingCount,
 	})
 }

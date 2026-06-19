@@ -192,8 +192,7 @@ export function CompanyPage() {
           </Panel>
         </div>
       ) : (() => {
-          const filtered = company.quarterly?.filter(q => q.quarter > 0) ?? []
-          const confirmedQ = filtered[filtered.length - 1] ?? null
+          const confirmedQ = company.last_quarterly
           const invDelta = confirmedQ ? confirmedQ.prod_qty - confirmedQ.sales_qty : 0
 
           return (

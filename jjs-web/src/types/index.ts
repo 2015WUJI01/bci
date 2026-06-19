@@ -130,7 +130,7 @@ export interface CompanyState {
   actual_output: number
   revenue: number
   profit: number
-  quarterly: QuarterlyReport[]
+  last_quarterly: QuarterlyReport | null
   pending_builds: number
 }
 
