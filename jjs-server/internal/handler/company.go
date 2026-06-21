@@ -42,7 +42,7 @@ type createCompanyResponse struct {
 		Name            string  `json:"name"`
 		Industry        string  `json:"industry"`
 		CEOID           string  `json:"ceo_id"`
-		Quarter         int     `json:"quarter"`
+		CreatedQuarter  int     `json:"created_quarter"`
 		Cash            int64   `json:"cash"`
 		Employees       int     `json:"employees"`
 		Status          string  `json:"status"`
@@ -174,7 +174,7 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Industry:    req.Industry,
 		Cash:        companyCash,
 		Employees:   ind.StartingEmployees,
-		Quarter:     1,
+		CreatedQuarter: int(engine.GlobalQuarter.Load()),
 		Status:      "active",
 		TotalShares: req.TotalShares,
 		CEOShares:   ceoShares,
@@ -243,7 +243,6 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 			slog.Error("create initial quarterly failed", "error", err)
 		}
 
-		company.Quarter = currentQuarter
 		if err := store.UpdateCompany(company); err != nil {
 			slog.Error("update company after initial settlement failed", "error", err)
 		}
@@ -347,7 +346,7 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		Name:            company.Name,
 		Industry:        company.Industry,
 		CEOID:           company.CEOID,
-		Quarter:         company.Quarter,
+		CreatedQuarter:  company.CreatedQuarter,
 		Cash:            int64(company.Cash),
 		Employees:       company.Employees,
 		Status:          company.Status,

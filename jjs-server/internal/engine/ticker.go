@@ -1,12 +1,14 @@
 package engine
 
 import (
+	"errors"
 	"log/slog"
 	"math"
 	"sync/atomic"
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"gorm.io/gorm"
 
 	"jjs-server/internal/domain"
 	"jjs-server/internal/store"
@@ -43,8 +45,9 @@ func (t *Ticker) Stop() {
 func (t *Ticker) onQuarterTick() {
 	// Step 0: finalize the quarter that just ended (sync, updates cash)
 	currentQ := int(GlobalQuarter.Load())
+	var companies []domain.Company
 	if currentQ > 0 {
-		finalizeQuarter(currentQ)
+		companies = finalizeQuarter(currentQ)
 	}
 
 	// Step 1: advance to the new quarter
@@ -67,14 +70,14 @@ func (t *Ticker) onQuarterTick() {
 	slog.Info("prosperity updated", "quarter", q)
 
 	// Step 3: pre-generate quarterly projections for the new quarter (async, cash untouched)
-	go preGenerateQuarter(int(q))
+	go preGenerateQuarter(companies, int(q))
 }
 
-func finalizeQuarter(quarter int) {
+func finalizeQuarter(quarter int) []domain.Company {
 	companies, err := store.GetActiveCompanies()
 	if err != nil {
 		slog.Error("finalize: failed to get active companies", "error", err)
-		return
+		return nil
 	}
 
 	slog.Info("finalizing quarter", "companies", len(companies), "quarter", quarter)
@@ -90,13 +93,14 @@ func finalizeQuarter(quarter int) {
 	}
 
 	slog.Info("finalize complete", "companies", len(companies), "quarter", quarter)
+	return companies
 }
 
-func preGenerateQuarter(quarter int) {
-	companies, err := store.GetActiveCompanies()
-	if err != nil {
-		slog.Error("pregen: failed to get active companies", "error", err)
-		return
+func preGenerateQuarter(companies []domain.Company, quarter int) {
+	if len(companies) == 0 {
+		if c, err := store.GetActiveCompanies(); err == nil {
+			companies = c
+		}
 	}
 
 	slog.Info("pre-generating quarterly projections", "companies", len(companies), "quarter", quarter)
@@ -119,7 +123,7 @@ func settleCompanyBaseline(c *domain.Company, quarter int, finalize bool) error 
 		if c.LastSettledQuarter >= quarter {
 			return nil
 		}
-		if c.Quarter > quarter {
+		if c.CreatedQuarter > quarter {
 			return nil
 		}
 	} else {
@@ -163,13 +167,7 @@ func settleManufacturing(c *domain.Company, cfg IndustryConfig, prosperity float
 	beginningCash := int64(math.Round(c.Cash))
 	newCash := beginningCash + result.Profit
 
-	tx := store.DB.Begin()
-
-	if finalize {
-		tx.Where("company_id = ? AND quarter = ?", c.ID, quarter).Delete(&domain.CompanyQuarterly{})
-	}
-
-	if err := tx.Create(&domain.CompanyQuarterly{
+	quarterlyRecord := domain.CompanyQuarterly{
 		CompanyID:       c.ID,
 		Quarter:         quarter,
 		Revenue:         result.Revenue,
@@ -189,9 +187,33 @@ func settleManufacturing(c *domain.Company, cfg IndustryConfig, prosperity float
 		CapCount:        c.CapCount,
 		Inventory:       result.Inventory,
 		Demand:          result.Demand,
-	}).Error; err != nil {
-		tx.Rollback()
-		return err
+	}
+
+	tx := store.DB.Begin()
+
+	if finalize {
+		var existing domain.CompanyQuarterly
+		err := tx.Where("company_id = ? AND quarter = ?", c.ID, quarter).First(&existing).Error
+		if err == nil {
+			quarterlyRecord.ID = existing.ID
+			if err := tx.Save(&quarterlyRecord).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := tx.Create(&quarterlyRecord).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+		} else {
+			tx.Rollback()
+			return err
+		}
+	} else {
+		if err := tx.Create(&quarterlyRecord).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
 	}
 
 	if finalize {
@@ -199,7 +221,6 @@ func settleManufacturing(c *domain.Company, cfg IndustryConfig, prosperity float
 			"cash":                 float64(newCash),
 			"inventory":            result.Inventory,
 			"demand":               result.Demand,
-			"quarter":              quarter,
 			"last_settled_quarter": quarter,
 		}).Error; err != nil {
 			tx.Rollback()
@@ -243,5 +264,5 @@ func RecoverSettlements() {
 	}
 
 	slog.Info("pre-generating projections for current quarter", "quarter", currentQ)
-	preGenerateQuarter(currentQ)
+	preGenerateQuarter(companies, currentQ)
 }

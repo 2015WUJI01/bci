@@ -117,7 +117,7 @@ export interface CompanyState {
   name: string
   industry: Industry
   ceo_id: string
-  quarter: number
+  created_quarter: number
   cash: number
   employees: number
   status: string
