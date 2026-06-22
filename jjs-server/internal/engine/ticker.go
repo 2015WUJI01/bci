@@ -45,9 +45,8 @@ func (t *Ticker) Stop() {
 func (t *Ticker) onQuarterTick() {
 	// Step 0: finalize the quarter that just ended (sync, updates cash)
 	currentQ := int(GlobalQuarter.Load())
-	var companies []domain.Company
 	if currentQ > 0 {
-		companies = finalizeQuarter(currentQ)
+		finalizeQuarter(currentQ)
 	}
 
 	// Step 1: advance to the new quarter
@@ -70,7 +69,7 @@ func (t *Ticker) onQuarterTick() {
 	slog.Info("prosperity updated", "quarter", q)
 
 	// Step 3: pre-generate quarterly projections for the new quarter (async, cash untouched)
-	go preGenerateQuarter(companies, int(q))
+	go preGenerateQuarter(nil, int(q))
 }
 
 func finalizeQuarter(quarter int) []domain.Company {
@@ -196,6 +195,7 @@ func settleManufacturing(c *domain.Company, cfg IndustryConfig, prosperity float
 		err := tx.Where("company_id = ? AND quarter = ?", c.ID, quarter).First(&existing).Error
 		if err == nil {
 			quarterlyRecord.ID = existing.ID
+			quarterlyRecord.CreatedAt = existing.CreatedAt
 			if err := tx.Save(&quarterlyRecord).Error; err != nil {
 				tx.Rollback()
 				return err
@@ -264,5 +264,5 @@ func RecoverSettlements() {
 	}
 
 	slog.Info("pre-generating projections for current quarter", "quarter", currentQ)
-	preGenerateQuarter(companies, currentQ)
+	preGenerateQuarter(nil, currentQ)
 }
