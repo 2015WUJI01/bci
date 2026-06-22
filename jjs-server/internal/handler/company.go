@@ -63,7 +63,7 @@ var industryPrefix = map[string]string{
 	"tech":          "TK",
 	"finance":       "JI",
 	"manufacturing": "ZA",
-	"energy":        "EN",
+	"mining":        "MN",
 	"consumer":      "XF",
 	"healthcare":    "YL",
 }
@@ -167,6 +167,11 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	capCount := 0
+	if req.Industry == "manufacturing" {
+		capCount = 1
+	}
+
 	company := &domain.Company{
 		CEOID:       userID,
 		Symbol:      symbol,
@@ -178,7 +183,7 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Status:      "active",
 		TotalShares: req.TotalShares,
 		CEOShares:   ceoShares,
-		CapCount:    1,
+		CapCount:    capCount,
 	}
 
 	if err := store.CreateCompany(company); err != nil {
@@ -236,6 +241,61 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 			TotalShares:     company.TotalShares,
 			CEOShares:       company.CEOShares,
 			CapCount:        company.CapCount,
+			Inventory:       result.Inventory,
+			Demand:          result.Demand,
+		}
+		if err := store.CreateQuarterly(quarterly); err != nil {
+			slog.Error("create initial quarterly failed", "error", err)
+		}
+
+		if err := store.UpdateCompany(company); err != nil {
+			slog.Error("update company after initial settlement failed", "error", err)
+		}
+	}
+
+	if req.Industry == "mining" {
+		company.CapCount = int(engine.MiningInitialReserves)
+		company.Demand = engine.InitialMiningDemand(company.ID, ind.StartingEmployees)
+
+		prosperity, err := store.LatestProsperity(req.Industry)
+		if err != nil {
+			prosperity = 1.0
+		}
+
+		currentQuarter := int(engine.GlobalQuarter.Load())
+		result := engine.SellMining(
+			company.ID,
+			company.Employees,
+			company.CapCount,
+			0,
+			company.Demand,
+			prosperity,
+			currentQuarter,
+			ind.BaseMaintenanceRate,
+			ind.OperationalCostRate,
+		)
+
+		beginningCash := int64(math.Round(company.Cash))
+		newCash := beginningCash + result.Profit
+
+		quarterly := &domain.CompanyQuarterly{
+			CompanyID:       company.ID,
+			Quarter:         currentQuarter,
+			Revenue:         result.Revenue,
+			Profit:          result.Profit,
+			BeginningCash:   beginningCash,
+			Cash:            newCash,
+			LaborCost:       result.LaborCost,
+			BaseMaintenance: result.BaseMaintenance,
+			OperationalCost: result.OperationalCost,
+			WarehouseCost:   result.WarehouseCost,
+			TotalCost:       result.LaborCost + result.BaseMaintenance + result.OperationalCost + result.WarehouseCost,
+			SalesQty:        result.SalesQty,
+			ProdQty:         result.ProdQty,
+			Employees:       company.Employees,
+			TotalShares:     company.TotalShares,
+			CEOShares:       company.CEOShares,
+			CapCount:        result.OreRemaining,
 			Inventory:       result.Inventory,
 			Demand:          result.Demand,
 		}
@@ -337,8 +397,21 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ownRatio := float64(10000) / float64(company.TotalShares)
-	capacityCeiling := engine.CapacityCeiling(company.Industry, company.CapCount)
-	actualOutput := engine.ActualOutput(company.Industry, company.Employees)
+	var capacityCeiling int64
+	var actualOutput int64
+	if company.Industry == "mining" {
+		quarterlyCap := int64(math.Ceil(float64(company.CapCount) * 0.2))
+		capacityCeiling = quarterlyCap
+		workerOutput := int64(company.Employees) * 1500
+		if workerOutput > quarterlyCap {
+			actualOutput = quarterlyCap
+		} else {
+			actualOutput = workerOutput
+		}
+	} else {
+		capacityCeiling = engine.CapacityCeiling(company.Industry, company.CapCount)
+		actualOutput = engine.ActualOutput(company.Industry, company.Employees)
+	}
 
 	WriteJSON(w, http.StatusOK, companyStateResponse{
 		ID:              company.ID,

@@ -134,7 +134,7 @@ export interface CompanyState {
   pending_builds: number
 }
 
-export type Industry = 'tech' | 'finance' | 'manufacturing' | 'energy' | 'consumer' | 'healthcare'
+export type Industry = 'tech' | 'finance' | 'manufacturing' | 'mining' | 'consumer' | 'healthcare'
 
 export interface IndustryInfo {
   id: Industry

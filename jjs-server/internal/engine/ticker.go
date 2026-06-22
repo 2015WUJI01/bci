@@ -145,6 +145,9 @@ func settleCompanyBaseline(c *domain.Company, quarter int, finalize bool) error 
 	if c.Industry == "manufacturing" {
 		return settleManufacturing(c, cfg, prosperity, quarter, false, finalize)
 	}
+	if c.Industry == "mining" {
+		return settleMining(c, cfg, prosperity, quarter, false, finalize)
+	}
 
 	return nil
 }
@@ -223,6 +226,84 @@ func settleManufacturing(c *domain.Company, cfg IndustryConfig, prosperity float
 			"demand":               result.Demand,
 			"last_settled_quarter": quarter,
 		}).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
+}
+
+func settleMining(c *domain.Company, cfg IndustryConfig, prosperity float64, quarter int, marketing bool, finalize bool) error {
+	result := SellMining(
+		c.ID,
+		c.Employees,
+		c.CapCount,
+		c.Inventory,
+		c.Demand,
+		prosperity,
+		quarter,
+		cfg.BaseMaintenanceRate,
+		cfg.OperationalCostRate,
+	)
+
+	beginningCash := int64(math.Round(c.Cash))
+	newCash := beginningCash + result.Profit
+
+	quarterlyRecord := domain.CompanyQuarterly{
+		CompanyID:       c.ID,
+		Quarter:         quarter,
+		Revenue:         result.Revenue,
+		Profit:          result.Profit,
+		BeginningCash:   beginningCash,
+		Cash:            newCash,
+		LaborCost:       result.LaborCost,
+		BaseMaintenance: result.BaseMaintenance,
+		OperationalCost: result.OperationalCost,
+		WarehouseCost:   result.WarehouseCost,
+		TotalCost:       result.LaborCost + result.BaseMaintenance + result.OperationalCost + result.WarehouseCost,
+		SalesQty:        result.SalesQty,
+		ProdQty:         result.ProdQty,
+		Employees:       c.Employees,
+		TotalShares:     c.TotalShares,
+		CEOShares:       c.CEOShares,
+		CapCount:        result.OreRemaining,
+		Inventory:       result.Inventory,
+		Demand:          result.Demand,
+	}
+
+	tx := store.DB.Begin()
+
+	if finalize {
+		var existing domain.CompanyQuarterly
+		err := tx.Where("company_id = ? AND quarter = ?", c.ID, quarter).First(&existing).Error
+		if err == nil {
+			quarterlyRecord.ID = existing.ID
+			if err := tx.Save(&quarterlyRecord).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := tx.Create(&quarterlyRecord).Error; err != nil {
+				tx.Rollback()
+				return err
+			}
+		} else {
+			tx.Rollback()
+			return err
+		}
+	} else {
+		if err := tx.Create(&quarterlyRecord).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if finalize {
+		if err := tx.Exec(
+			"UPDATE companies SET cash = ?, inventory = ?, cap_count = ?, demand = ?, last_settled_quarter = ? WHERE id = ?",
+			float64(newCash), result.Inventory, result.OreRemaining, result.Demand, quarter, c.ID,
+		).Error; err != nil {
 			tx.Rollback()
 			return err
 		}

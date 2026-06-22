@@ -9,7 +9,7 @@ const INDUSTRY_META: Record<string, { name: string; icon: string; desc: string; 
   tech:          { name: '科技',     icon: '💻', desc: '技术驱动，重研发投入，设备迭代快', enabled: false },
   finance:       { name: '金融',     icon: '🏦', desc: '资本运作，高杠杆高回报，牌照壁垒高', enabled: false },
   manufacturing: { name: '制造',     icon: '🏭', desc: '产能为王，规模效应，注意库存积压', enabled: true },
-  energy:        { name: '能源',     icon: '🛢️', desc: '资源开采，矿藏会枯竭，需持续勘探', enabled: false },
+  mining:        { name: '矿业',     icon: '⛏️', desc: '探明矿藏，挖一点少一点，价格波动最剧烈', enabled: true },
   consumer:      { name: '消费',     icon: '🛍️', desc: '品牌驱动，营销为王，热度就是生命', enabled: false },
   healthcare:    { name: '医疗',     icon: '💊', desc: '研发周期长，专利护城河，慢热暴利', enabled: false },
 }
@@ -245,26 +245,51 @@ function DetailItem({ label, value, positive, hint }: {
           <Panel title="经营指标">
             <div className="p-3">
               <div className="grid grid-cols-2 gap-2">
-                <MetricCard label="生产线" value={`${company.cap_count}条`} />
-                <MetricCard label="员工" value={`${company.employees}人`} />
-                <MetricCard
-                  label="有效产能"
-                  value={`${company.actual_output.toLocaleString()}件/季`}
-                  hint={`员工 ${company.employees}人 × 2,000件/人 = ${company.actual_output.toLocaleString()}件`}
-                />
-                <MetricCard
-                  label="产能上限"
-                  value={`${company.capacity_ceiling.toLocaleString()}件/季`}
-                  hint={`${company.cap_count}条产线 × 10,000件/条 = ${company.capacity_ceiling.toLocaleString()}件`}
-                />
+                {company.industry === 'mining' ? (
+                  <>
+                    <MetricCard
+                      label="矿藏储量"
+                      value={`${company.cap_count.toLocaleString()}单位`}
+                      hint={`剩余可开采总量，每季最多开采 20%（即 ${company.capacity_ceiling.toLocaleString()} 单位）`}
+                    />
+                    <MetricCard
+                      label="季度上限"
+                      value={`${company.capacity_ceiling.toLocaleString()}单位/季`}
+                      hint={`探明储量 × 20% = ${(company.cap_count).toLocaleString()} × 0.2 = ${company.capacity_ceiling.toLocaleString()}（向上取整）`}
+                    />
+                    <MetricCard label="员工" value={`${company.employees}人`} />
+                    <MetricCard
+                      label="有效产量"
+                      value={`${company.actual_output.toLocaleString()}单位/季`}
+                      hint={`员工 ${company.employees}人 × 1,500单位/人 = ${(company.employees * 1500).toLocaleString()}；受季度上限 ${company.capacity_ceiling.toLocaleString()} 限制`}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <MetricCard label="生产线" value={`${company.cap_count}条`} />
+                    <MetricCard label="员工" value={`${company.employees}人`} />
+                    <MetricCard
+                      label="有效产能"
+                      value={`${company.actual_output.toLocaleString()}件/季`}
+                      hint={`员工 ${company.employees}人 × 2,000件/人 = ${company.actual_output.toLocaleString()}件`}
+                    />
+                    <MetricCard
+                      label="产能上限"
+                      value={`${company.capacity_ceiling.toLocaleString()}件/季`}
+                      hint={`${company.cap_count}条产线 × 10,000件/条 = ${company.capacity_ceiling.toLocaleString()}件`}
+                    />
+                  </>
+                )}
                 <MetricCard
                   label="库存"
-                  value={company.inventory > 0 ? `${company.inventory.toLocaleString()}件` : '—'}
+                  value={company.inventory > 0 ? `${company.inventory.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}` : '—'}
                   hint={confirmedQ ? `上季产量 ${confirmedQ.prod_qty.toLocaleString()} - 销量 ${confirmedQ.sales_qty.toLocaleString()} = 库存${invDelta >= 0 ? '+' : ''}${invDelta.toLocaleString()}` : undefined}
                 />
                 {company.pending_builds > 0 ? (
                   <div className="bg-bg-card rounded p-2.5 border border-border flex items-center">
-                    <span className="text-xs text-accent-gold">⏳ {company.pending_builds} 个产线建造中</span>
+                    <span className="text-xs text-accent-gold">
+                      ⏳ {company.pending_builds} 个{company.industry === 'mining' ? '勘探' : '产线建造'}中
+                    </span>
                   </div>
                 ) : <div />}
               </div>
@@ -359,13 +384,23 @@ function DetailItem({ label, value, positive, hint }: {
                     <div className="text-xs font-semibold text-text-secondary mb-2 tracking-wider">运营指标</div>
                     <div className="grid grid-cols-2 gap-2">
                       <DetailItem label="员工" value={`${confirmedQ.employees}人`} />
-                      <DetailItem label="产线" value={`${confirmedQ.cap_count}条`} />
-                      <DetailItem label="有效产能" value={`${Math.min(confirmedQ.employees * 2000, confirmedQ.cap_count * 10000).toLocaleString()}件/季`} />
-                      <DetailItem label="产能上限" value={`${(confirmedQ.cap_count * 10000).toLocaleString()}件/季`} />
-                      <DetailItem label="产量" value={`${confirmedQ.prod_qty.toLocaleString()}件`} />
-                      <DetailItem label="销量" value={`${confirmedQ.sales_qty.toLocaleString()}件`} />
-                      <DetailItem label="库存变更" value={`${confirmedQ.prod_qty - confirmedQ.sales_qty >= 0 ? '+' : ''}${(confirmedQ.prod_qty - confirmedQ.sales_qty).toLocaleString()}件`} positive={confirmedQ.prod_qty - confirmedQ.sales_qty >= 0} />
-                      <DetailItem label="库存" value={confirmedQ.inventory > 0 ? `${confirmedQ.inventory.toLocaleString()}件` : '—'} />
+                      {company.industry === 'mining' ? null : (
+                        <DetailItem label="产线" value={`${confirmedQ.cap_count}条`} />
+                      )}
+                      <DetailItem
+                        label={company.industry === 'mining' ? '工人产能' : '有效产能'}
+                        value={company.industry === 'mining'
+                          ? `${(confirmedQ.employees * 1500).toLocaleString()}单位/季`
+                          : `${Math.min(confirmedQ.employees * 2000, confirmedQ.cap_count * 10000).toLocaleString()}件/季`
+                        }
+                      />
+                      {company.industry === 'mining' ? null : (
+                        <DetailItem label="产能上限" value={`${(confirmedQ.cap_count * 10000).toLocaleString()}件/季`} />
+                      )}
+                      <DetailItem label="产量" value={`${confirmedQ.prod_qty.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}`} />
+                      <DetailItem label="销量" value={`${confirmedQ.sales_qty.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}`} />
+                      <DetailItem label="库存变更" value={`${confirmedQ.prod_qty - confirmedQ.sales_qty >= 0 ? '+' : ''}${(confirmedQ.prod_qty - confirmedQ.sales_qty).toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}`} positive={confirmedQ.prod_qty - confirmedQ.sales_qty >= 0} />
+                      <DetailItem label="库存" value={confirmedQ.inventory > 0 ? `${confirmedQ.inventory.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}` : '—'} />
                     </div>
                   </section>
 
@@ -383,7 +418,7 @@ function DetailItem({ label, value, positive, hint }: {
 
           {company.pending_builds > 0 && (
             <div className="mt-2 text-xs text-accent-gold">
-              ⏳ {company.pending_builds} 个产能正在建造中
+              ⏳ {company.pending_builds} 个{company.industry === 'mining' ? '勘探' : '产能'}正在建造中
             </div>
           )}
         </div>

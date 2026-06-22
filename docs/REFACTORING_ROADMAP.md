@@ -281,7 +281,7 @@ Profit           = Revenue - TotalCost
 1. **预报阶段**（preGenerate）：每个 tick 进入新季度后，异步生成当前季度的 CompanyQuarterly 预报记录。不更新公司现金和 `LastSettledQuarter`，公司不可使用本期利润。
 2. **最终结算阶段**（finalize）：每个 tick 开始时，先结算刚结束的季度——删除预报记录，创建最终季报，利润加入公司现金，更新 `LastSettledQuarter`。
 
-当前仅制造行业启用——非制造业 `settleCompanyBaseline` 直接 `return nil`，待具体行业设计后实现。创建公司时仅生成首季预报（现金仅含初始投资），利润在首次 tick 最终结算时到账。
+当前制造和矿业已启用——非制造/矿业 `settleCompanyBaseline` 直接 `return nil`，待具体行业设计后实现。创建公司时仅生成首季预报（现金仅含初始投资），利润在首次 tick 最终结算时到账。
 
 `Company.LastSettledQuarter` 字段逐公司追踪结算进度，用于启动恢复（`RecoverSettlements`）和最终结算的去重。`settleCompanyBaseline` 带 `c.Quarter > quarter` 保护，防止对公司尚未存在的季度错误结算。
 
@@ -317,6 +317,11 @@ internal/handler/
 ├── player.go                       # ✅ GET /api/player/info（JWT 认证，返回 nickname/email/cash/frozen_cash/margin_debt）
 internal/engine/
 ├── portfolio.go                    # ⏳ 玩家资产 + 持仓管理（待实现）
+├── manufacturing.go                # ✅ 制造业生产模型
+├── mining.go                       # ✅ 矿业生产模型（储量递减 + 每季20%上限）
+├── prosperity.go                   # ✅ 景气度随机游走
+├── ticker.go                       # ✅ 季度定时器 + 结算调度
+├── industry.go                     # ✅ 6 行业常量配置
 ```
 
 **资产功能**:
@@ -333,6 +338,8 @@ internal/engine/
 
 **P2 产出清单（整体目标）**:
 - ✅ 6 行业全部参数配置完成
+- ✅ 制造业生产模型 + 季度结算已完成
+- ✅ 矿业生产模型 + 季度结算已完成（2026-06-22，第二个启用行业）
 - ✅ 公司创建 + 行业选择 API 可用
 - ⏳ 季度结算完整跑通（AP 决策 → 董事会考核 → 股价更新）
 - ⏳ 17 个行动全部可执行，效果/约束/冷却/递减正确
