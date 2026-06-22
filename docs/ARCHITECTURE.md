@@ -387,4 +387,29 @@ frontend/src/
 │   └── constants.ts
 │
 └── types/                      # TypeScript 类型定义
+
+---
+
+## 新系统 (Go + React) 开发经验
+
+以下问题在对等重构中已踩坑，记录在此供参考。
+
+### 行业结算函数的一致性模式
+
+**问题**：矿业公司创建和季度结算时，`cap_count`（矿物储量）仅在 `company_quarterly` 季报表中递减，而 `companies` 主表未更新。
+
+**根因**：
+
+| 位置 | 问题 |
+|------|------|
+| `handler/company.go` 创建流程 | `SellMining` 返回了 `result.OreRemaining`，但 `company.CapCount` 未同步写回就调了 `UpdateCompany` |
+| `ticker.go` `settleMining` | 使用了 `tx.Exec(raw SQL)` 而非 `tx.Model(c).Updates(map)`，与 `settleManufacturing` 模式不一致；且更新已有季报时漏了 `CreatedAt` 保留 |
+
+**教训**：
+
+1. **handler 和 ticker 的结算结果必须双写** — 季报 (`CompanyQuarterly`) 和公司主表 (`Company`) 状态必须同步更新，不能遗漏任何字段
+2. **同行业结算函数保持代码一致性** — `settleMining` 和 `settleManufacturing` 应用相同的 GORM 模式：
+   - 写主表用 `tx.Model(c).Updates(map[string]interface{}{...})` 而非 raw SQL
+   - 更新已有季报时必须保留 `CreatedAt = existing.CreatedAt`
+3. **避免 raw SQL 与 GORM 混用** — `tx.Exec` 的参数绑定可能与 GORM 事务行为不一致，统一用 `tx.Model().Updates()` 更可靠
 ```

@@ -279,6 +279,7 @@ func settleMining(c *domain.Company, cfg IndustryConfig, prosperity float64, qua
 		err := tx.Where("company_id = ? AND quarter = ?", c.ID, quarter).First(&existing).Error
 		if err == nil {
 			quarterlyRecord.ID = existing.ID
+			quarterlyRecord.CreatedAt = existing.CreatedAt
 			if err := tx.Save(&quarterlyRecord).Error; err != nil {
 				tx.Rollback()
 				return err
@@ -300,10 +301,13 @@ func settleMining(c *domain.Company, cfg IndustryConfig, prosperity float64, qua
 	}
 
 	if finalize {
-		if err := tx.Exec(
-			"UPDATE companies SET cash = ?, inventory = ?, cap_count = ?, demand = ?, last_settled_quarter = ? WHERE id = ?",
-			float64(newCash), result.Inventory, result.OreRemaining, result.Demand, quarter, c.ID,
-		).Error; err != nil {
+		if err := tx.Model(c).Updates(map[string]interface{}{
+			"cash":                 float64(newCash),
+			"inventory":            result.Inventory,
+			"cap_count":            result.OreRemaining,
+			"demand":               result.Demand,
+			"last_settled_quarter": quarter,
+		}).Error; err != nil {
 			tx.Rollback()
 			return err
 		}

@@ -248,6 +248,10 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 			slog.Error("create initial quarterly failed", "error", err)
 		}
 
+		company.Cash = float64(newCash)
+		company.Inventory = result.Inventory
+		company.Demand = result.Demand
+		company.LastSettledQuarter = currentQuarter
 		if err := store.UpdateCompany(company); err != nil {
 			slog.Error("update company after initial settlement failed", "error", err)
 		}
@@ -303,6 +307,11 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 			slog.Error("create initial quarterly failed", "error", err)
 		}
 
+		company.CapCount = result.OreRemaining
+		company.Cash = float64(newCash)
+		company.Inventory = result.Inventory
+		company.Demand = result.Demand
+		company.LastSettledQuarter = currentQuarter
 		if err := store.UpdateCompany(company); err != nil {
 			slog.Error("update company after initial settlement failed", "error", err)
 		}
