@@ -399,62 +399,178 @@ internal/engine/
 
 ## P3: 核心交易引擎 (5-7 天)
 
-> **前提**: P2 公司运营 v2 完成，股票已发行，流通股已确定，v2 股价公式已实现。
-> **目标**: 重写股票交易核心——订单簿、撮合引擎、主循环、行情更新。
+> **前提**: P2 公司运营 v2 完成（扩产/招人 action + 季度结算 + 股价公式）。
+> **目标**: 实现 IPO 上市、订单簿撮合、证券机构库存释放、多股票行情、K 线聚合。
+>
+> **设计依据**: `COMPANY_V2_DESIGN.md` §十六、`GAME_DESIGN.md` §2.1-2.3。
 
-### 参考旧代码 / 设计文档
+### 参考文档
 
 | 文件 | 用途 |
 |------|------|
-| `backend/game_engine.py` | 引擎逻辑，`_sweep_*`, `execute_trade`, `price_tick_loop` |
-| `backend/config.py` | 交易参数（手续费率、持仓上限、涨跌停幅度等） |
-| `backend/schemas.py` | WS 消息格式定义 |
-| `COMPANY_V2_DESIGN.md` §十一 | v2 股价公式——行情更新需对接此公式 |
+| `COMPANY_V2_DESIGN.md` §十六 | IPO 机制、股份结构、减持、证券机构 |
+| `COMPANY_V2_DESIGN.md` §十一 | 股价公式、总资产/NAV/EPS |
+| `backend/game_engine.py` | 引擎逻辑参考 |
+| `backend/schemas.py` | WS 消息格式参考 |
 
-### P3.1: 全局市场状态 (1 天)
+### 关键常量
+
+| 参数 | 值 |
+|------|-----|
+| 交易 tick | 2 秒 |
+| tick/季 | 150 (5分钟) |
+| K 线周期 | 40t / 150t / 600t |
+| 证券机构扫描间隔 | 5 tick |
+| 未成交买单超时 | 10 tick |
+
+### P3.1: 数据模型变更与 Company IPO 字段 (1 天)
+
+**Company 表新增字段**:
+- `CEOShares` 改为 int64（现有字段不变）
+- `InvestorShares` int64 — **新增**。投资方持股（创建时玩家输入）
+- `TotalShares` int64 — **新增**。派生字段 = CEOShares + InvestorShares + PublicFloat
+- `IpoQuarter` int — **新增**。IPO 季度号，0=未上市
+- `PublicFloat` int64 — **新增**。流通股（IPO 增发股数）
+
+**IndustryConfig 新增**:
+- `CapAssetValue` float64 — 固定资产单位估值
+- 矿业探索期望调至 60,000（CapAssetValue = 120,000/60,000 = 2.0）
+
+**新建 GORM 模型**:
+```
+Stock              # 上市股票: price/volume/PE/NAV/盘口五档
+Order              # 订单簿: limit/market, side, price, qty, status
+Trade              # 成交记录: buyer/seller, buyOrderID/sellOrderID
+Candle             # K线聚合: period, openTime, OHLC
+BrokerInventory    # 证券机构: TotalQty/FrozenQty
+```
+
+**修改现有模型**:
+- `Holding`: `Symbol` 改为 `StockID` 外键
+- `Transaction` → 重写为 `Trade` 模型
+
+**产出**: GORM 模型定义 + AutoMigrate + `store/` CRUD。
+
+### P3.2: IPO 上市流程 (1 天)
+
+**IPO 条件校验**（`handler/ipo.go`）:
+
+| 条件 | 值 |
+|------|-----|
+| 运营季度 | ≥ 12 季 |
+| 连续盈利 | ≥ 4 季 |
+| 现金 | ≥ ¥1,000,000 |
+| 年度营收 | 近4季合计 ≥ ¥5,000,000 |
+
+**POST /api/company/ipo**:
+
+```
+Body: { public_float_ratio: 0.10~0.50 }
+即时执行:
+  1. 校验 IPO 条件
+  2. 计算发行价 = round((NAV + EPS×行业PE×景气度) × 0.95 × 100) 分
+  3. 增发股数 = TotalShares × ratio
+  4. Company.Cash += 增发股数 × 发行价
+  5. Company.TotalShares += 增发股数
+  6. Company.PublicFloat = 增发股数
+  7. Company.IpoQuarter = 当前季度
+  8. 创建 Stock 行
+  9. BrokerInventory.TotalQty = 增发股数
+```
+
+**CEO 减持**（公司 action，`handler/action.go` 扩展）:
+
+```go
+type IPOAction = "ipo" | "divest"
+// divest: IpoQuarter+4季度后可执行
+// 上限: min(ceo_shares, total_shares × 5%)
+// CEO 持股 → BrokerInventory → 市场释放
+```
+
+**产出**: `POST /api/company/ipo` 端点 + 减持 action 扩展 + 发行价计算。
+
+### P3.3: 订单簿与撮合引擎 (1.5 天)
 
 ```
 internal/engine/
-├── state.go                       # GlobalMarketState struct
+├── orderbook.go     # 订单簿: bid/ask 排序树 + 盘口五档广播
+├── matching.go      # 撮合: limit进簿 / market扫单 / 价格优先→时间优先
+├── broker.go        # 证券机构扫描: 超时买单释放库存
+└── state.go         # GlobalMarketState: maps[Stock] + RWMutex
 ```
 
-- 用 `sync.RWMutex` 替代 Python 的 GIL 隐式保护
-- 明确区分公开字段和内部字段
-- 处理已知设计问题：`player_type` 字段替代 `player_id.startswith()` 判断
+- 限价单挂入 bid/ask 堆（按价格排序 + SeqNum 时间优先）
+- 市价单立即扫最优价位
+- 部分成交处理（FilledQty < Qty → partial，修改剩余量继续）
+- 每次撮合检查：买方现金 ≥ Price×Qty+手续费、卖方可用持仓 ≥ Qty
+- 证券机构库存扫描：每 5 tick 检查未成交超过 10 tick 的买单，按价优先卖出
+- 每笔成交 → 写入 Trade 表 + 更新 Stock 行情 + 聚合 Candle
 
-### P3.2: 订单簿与撮合 (2 天)
+**产出**: 订单簿匹配单元测试可过（无做空）。
 
-```
-internal/engine/
-├── orderbook.go                   # 订单簿数据 + 盘口广播
-├── matching.go                    # 交易匹配引擎
-```
-
-- 限价单簿（bid/ask 两棵排序树）
-- 市价单扫单逻辑（吃限价单）
-- 价格优先 → 时间优先撮合
-- 部分成交处理
-- `execute_trade` 拆分为 `executeBuy` / `executeSell` / `executeShort` / `executeCover`
-- 手续费计算、持仓上限检查
-- 股票可交易数量受公司流通股限制
-
-### P3.3: 主循环与行情 (2 天)
+### P3.4: 主循环与行情 (1.5 天)
 
 ```
 internal/engine/
-├── ticker.go                      # 主循环 goroutine
-├── signals.go                     # 信号计算 (_compute_signal, _ma)
-├── price_update.go                # 价格更新（短期波动来自 order flow，长期锚定 v2 股价公式）
-├── candle.go                      # K 线聚合
-├── persistence.go                 # 定时落盘（GORM 批量写入）
-└── initialization.go              # 市场初始化
+├── ticker.go        # 2s Ticker: onTick 聚合所有流程
+├── price_update.go  # 价格更新: 短期由 order flow 驱动，长期锚定 V2公式
+├── candle.go        # K线聚合: 40t/150t/600t 三周期
+└── persistence.go   # 批量落盘: Stock/Candle upsert
 ```
 
-- 主循环用 `time.Ticker` + `context` 控制启停
-- 每 tick 流程：公司季度检查 → AI Bot → 撮合 → 价格更新 → candle 聚合 → 广播 → 持久化
-- **关键对接**: `price_update.go` 的短期价格漂移需锚定 v2 股价公式的理论价格，防止市场价与基本面脱锚
-- GORM 批量 upsert 落盘（替代 `mark_dirty`）
-- 市场初始化（从 MySQL 加载公司和玩家数据）
+每 tick 流程:
+
+```
+1. 公司季度检查 (cron 5min, 复用 P2)
+2. [P4] AI Bot 下单
+3. 撮合引擎: 匹配买入/卖出
+4. 证券机构扫描: 释放库存
+5. 价格更新: CurrentPrice = 最近一笔成交价
+6. 新季时: Stock.Open/High/Low 重置为当前价, PrevClose = 上季末价
+7. Candle 聚合: 检查是否需要生成新 K 线
+8. 广播: Stock 行情 → WS
+9. 持久化: GORM 批量 upsert Stock + Candle
+```
+
+**产出**: ticker goroutine 完整主循环 + 行情更新 + K 线聚合。
+
+### P3.5: API 与符号生成 (1 天)
+
+**新增/修改 API**:
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/company/ipo` | 发起 IPO |
+| GET | `/api/market/stocks` | 上市股票列表 |
+| GET | `/api/market/stock/{symbol}` | 单股行情 |
+| GET | `/api/market/kline/{symbol}` | K 线数据 |
+| GET | `/api/market/orderbook/{symbol}` | 盘口 |
+| POST | `/api/trade/order` | 下单 |
+| DELETE | `/api/trade/order/{id}` | 撤单 |
+| GET | `/api/portfolio` | 我的持仓/资产 |
+| GET | `/api/trade/orders` | 我的挂单 |
+
+**Symbol 生成改为前缀+自增序号**:
+
+```
+行业前缀: tech=TK, finance=FI, manufacturing=MF, mining=MN, consumer=CS, healthcare=YL
+查询现有最大值 +1: SELECT MAX(symbol) FROM companies WHERE symbol LIKE 'MF%'
+并发: uniqueIndex 兜底 + 重试
+```
+
+**产出**: 全部交易 API 可用 + Symbol 生成器重写。
+
+### P3 产出清单
+
+- ✅ GORM 模型: Stock/Order/Trade/Candle/BrokerInventory + Company 新增字段
+- ✅ IPO 条件校验 + POST /api/company/ipo + 发行价计算
+- ✅ CEO 减持 action 扩展
+- ✅ 订单簿撮合引擎 (limit/market, 无做空)
+- ✅ 证券机构库存释放机制
+- ✅ 2s tick 主循环 + 行情更新 (锚定 V2 公式)
+- ✅ K 线 40t/150t/600t 三周期聚合
+- ✅ 完整 REST API (行情/下单/撤单/持仓)
+- ✅ Symbol 前缀+自增序号生成
 
 ---
 
