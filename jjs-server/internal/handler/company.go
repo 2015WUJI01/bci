@@ -36,6 +36,11 @@ type createCompanyResponse struct {
 	OwnRatio    float64 `json:"own_ratio"`
 }
 
+type PendingOrderInfo struct {
+	ReadyQuarter int `json:"ready_quarter"`
+	Amount       int `json:"amount"`
+}
+
 	type companyStateResponse struct {
 		ID              uint    `json:"id"`
 		Symbol          string  `json:"symbol"`
@@ -56,7 +61,8 @@ type createCompanyResponse struct {
 		Revenue         int64   `json:"revenue"`
 		Profit          int64   `json:"profit"`
 		LastQuarterly   *domain.CompanyQuarterly `json:"last_quarterly"`
-		PendingBuilds   int     `json:"pending_builds"`
+		PendingOrders   []PendingOrderInfo       `json:"pending_orders"`
+		ActionsSubmitted int                     `json:"actions_submitted"`
 	}
 
 var industryPrefix = map[string]string{
@@ -385,9 +391,14 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pendingOrders, err := store.GetPendingBuildOrders(company.ID)
-	pendingCount := 0
+	pendingList := []PendingOrderInfo{}
 	if err == nil {
-		pendingCount = len(pendingOrders)
+		for _, o := range pendingOrders {
+			pendingList = append(pendingList, PendingOrderInfo{
+				ReadyQuarter: o.ReadyQuarter,
+				Amount:       o.Amount,
+			})
+		}
 	}
 
 	confirmedQuarter := int(engine.GlobalQuarter.Load()) - 1
@@ -422,6 +433,18 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		actualOutput = engine.ActualOutput(company.Industry, company.Employees)
 	}
 
+	currentQ := int(engine.GlobalQuarter.Load())
+	var actionsSubmitted int
+	for _, q := range quarterly {
+		if q.Quarter == currentQ {
+			var acts []domain.ActionLog
+			if err := json.Unmarshal(q.Actions, &acts); err == nil {
+				actionsSubmitted = len(acts)
+			}
+			break
+		}
+	}
+
 	WriteJSON(w, http.StatusOK, companyStateResponse{
 		ID:              company.ID,
 		Symbol:          company.Symbol,
@@ -442,6 +465,7 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		Revenue:         revenue,
 		Profit:          profit,
 		LastQuarterly:   lastQ,
-		PendingBuilds:   pendingCount,
+		PendingOrders:   pendingList,
+		ActionsSubmitted: actionsSubmitted,
 	})
 }

@@ -111,6 +111,11 @@ export interface PendingOrder {
   createdAt: string
 }
 
+export interface PendingOrderInfo {
+  ready_quarter: number
+  amount: number
+}
+
 export interface CompanyState {
   id: number
   symbol: string
@@ -131,7 +136,8 @@ export interface CompanyState {
   revenue: number
   profit: number
   last_quarterly: QuarterlyReport | null
-  pending_builds: number
+  pending_orders: PendingOrderInfo[]
+  actions_submitted: number
 }
 
 export type Industry = 'tech' | 'finance' | 'manufacturing' | 'mining' | 'consumer' | 'healthcare'

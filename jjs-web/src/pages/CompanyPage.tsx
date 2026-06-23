@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { api } from '@/api/client'
@@ -45,6 +45,11 @@ export function CompanyPage() {
   const [actionView, setActionView] = useState<'selection' | 'expand' | 'hire'>('selection')
   const [actionAmount, setActionAmount] = useState(0)
   const [actionsSubmitted, setActionsSubmitted] = useState(0)
+  useEffect(() => {
+    if (company?.actions_submitted !== undefined) {
+      setActionsSubmitted(company.actions_submitted)
+    }
+  }, [company?.actions_submitted])
   const [submittingActions, setSubmittingActions] = useState(false)
   const [actionError, setActionError] = useState('')
   const queryClient = useQueryClient()
@@ -315,24 +320,48 @@ function DetailItem({ label, value, positive, hint }: {
                   value={company.inventory > 0 ? `${company.inventory.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}` : '—'}
                   hint={confirmedQ ? `上季产量 ${confirmedQ.prod_qty.toLocaleString()} - 销量 ${confirmedQ.sales_qty.toLocaleString()} = 库存${invDelta >= 0 ? '+' : ''}${invDelta.toLocaleString()}` : undefined}
                 />
-                {company.pending_builds > 0 ? (
-                  <div className="bg-bg-card rounded p-2.5 border border-border flex items-center">
-                    <span className="text-xs text-accent-gold">
-                      ⏳ {company.pending_builds} 个{company.industry === 'mining' ? '勘探' : '产线建造'}中
-                    </span>
-                  </div>
-                ) : <div />}
               </div>
               <div className="mt-3 pt-3 border-t border-border">
                 <button
                   className="btn btn-primary btn-full"
                   onClick={() => { setShowActions(true); setActionView('selection'); setActionAmount(0); setActionError('') }}
                 >
-                  ⚡ 经营行动{actionsSubmitted > 0 ? ` (${actionsSubmitted}/3)` : ''}
+                  ⚡ 经营行动{actionsSubmitted > 0 ? ` (剩余 ${remaining}/3)` : ''}
                 </button>
               </div>
             </div>
           </Panel>
+
+          {company.pending_orders.length > 0 && (
+            <Panel title="在建工程">
+              <div className="p-3 space-y-2">
+                {company.pending_orders.map((order, i) => {
+                  const remainingQ = order.ready_quarter - (playerInfo?.global_quarter ?? 0)
+                  return (
+                    <div key={i} className="bg-bg-card rounded p-3 border border-border flex items-center gap-3">
+                      <span className="text-xl">{isMfg ? '🏭' : '⛏️'}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-text-primary">
+                          {isMfg ? '新建产线' : '勘探矿脉'}
+                        </div>
+                        <div className="text-xs text-text-muted mt-0.5">
+                          {isMfg ? `${order.amount} 条产线` : `${order.amount.toLocaleString()} 单位储量`}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs text-accent-gold font-semibold">
+                          {remainingQ > 0 ? `${remainingQ} 季度后${isMfg ? '投产' : '完工'}` : '本季度'}
+                        </div>
+                        <div className="text-[10px] text-text-muted">
+                          预计 {formatQuarter(order.ready_quarter)}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </Panel>
+          )}
 
           <Panel title="股权结构">
             <div className="p-3">
@@ -457,7 +486,7 @@ function DetailItem({ label, value, positive, hint }: {
           {showActions && (
             <div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-              onClick={() => { setShowActions(false); setActionView('selection'); setActionsSubmitted(0) }}
+              onClick={() => { setShowActions(false); setActionView('selection') }}
             >
               <div
                 className="bg-bg-card border border-border rounded-lg shadow-xl w-full max-w-sm mx-4 overflow-hidden"
@@ -471,7 +500,7 @@ function DetailItem({ label, value, positive, hint }: {
                       </h3>
                       <button
                         className="text-text-muted hover:text-text-primary transition-colors text-lg leading-none"
-                        onClick={() => { setShowActions(false); setActionsSubmitted(0) }}
+                        onClick={() => { setShowActions(false) }}
                       >
                         ✕
                       </button>
@@ -576,12 +605,6 @@ function DetailItem({ label, value, positive, hint }: {
                   </>
                 )}
               </div>
-            </div>
-          )}
-
-          {company.pending_builds > 0 && (
-            <div className="mt-2 text-xs text-accent-gold">
-              ⏳ {company.pending_builds} 个{company.industry === 'mining' ? '勘探' : '产能'}正在建造中
             </div>
           )}
         </div>
