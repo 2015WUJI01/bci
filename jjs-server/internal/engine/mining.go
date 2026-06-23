@@ -6,13 +6,14 @@ import (
 )
 
 const (
-	miningUnitPrice          = 12.0
-	miningUnitOutput         = 1500
-	miningWarehouseCostRate  = 0.3
-	miningLaborRate          = 2500
-	miningOperationalPerHead = 1200
-	miningMaintenanceDivisor = 100
-	MiningInitialReserves    = 50000
+	miningUnitPrice           = 12.0
+	miningUnitOutput          = 1500
+	miningWarehouseCostRate   = 0.3
+	miningLaborRate           = 2500
+	miningOperationalPerHead  = 1200
+	miningMaintenanceDivisor  = 100
+	MiningInitialReserves     = 50000
+	miningDemandCapMultiplier = 2.0 // 需求上限 = 产能 × 倍数
 )
 
 func ProspectOreReserves(rng *rand.Rand) int64 {
@@ -44,18 +45,18 @@ type MiningResult struct {
 	Profit          int64
 }
 
-func MiningRNG(companyID uint, quarter int, aspect string) *rand.Rand {
+func MiningRNG(companyID uint, quarter int, aspect string, idx int) *rand.Rand {
 	aspects := map[string]int64{
 		"volatility":  1,
 		"demand_init": 2,
 		"prospect":    3,
 	}
-	seed := int64(companyID)*1_000_000 + int64(quarter)*100 + aspects[aspect]
+	seed := int64(companyID)*1_000_000 + int64(quarter)*100 + aspects[aspect] + int64(idx)
 	return rand.New(rand.NewSource(seed))
 }
 
 func InitialMiningDemand(companyID uint, employees int) int64 {
-	rng := MiningRNG(companyID, 0, "demand_init")
+	rng := MiningRNG(companyID, 0, "demand_init", 0)
 	baseDemand := float64(employees) * miningUnitOutput
 	startRatio := 0.5 + rng.Float64()*0.3
 	return int64(math.Round(baseDemand * startRatio))
@@ -72,18 +73,22 @@ func SellMining(
 	baseMaintenanceRate int64,
 	operationalCostRate int64,
 ) MiningResult {
-	volatilityRNG := MiningRNG(companyID, quarter, "volatility")
+	volatilityRNG := MiningRNG(companyID, quarter, "volatility", 0)
 	iv := (volatilityRNG.Float64()*2 - 1) * 0.10
 
 	sellingPrice := miningUnitPrice * math.Pow(prosperity, 1.2)
 
-	prevD := float64(prevDemand)
-	demand := prevD * (prosperity + iv)
-	demandInt := int64(math.Round(math.Max(demand, 0)))
-
 	workerOutput := float64(employees) * miningUnitOutput
 	maxProduction := math.Ceil(float64(capCount) * 0.2)
 	prodQty := math.Min(workerOutput, maxProduction)
+
+	prevD := float64(prevDemand)
+	demand := prevD * (prosperity + iv)
+	demandCap := prodQty * miningDemandCapMultiplier
+	if demand > demandCap {
+		demand = demandCap
+	}
+	demandInt := int64(math.Round(math.Max(demand, 0)))
 
 	salesQty := math.Min(prodQty+float64(prevInventory), float64(demandInt))
 
