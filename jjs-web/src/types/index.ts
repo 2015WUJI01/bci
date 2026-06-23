@@ -184,6 +184,26 @@ export interface RandomEvent {
   type: 'positive' | 'negative' | 'neutral'
 }
 
+export interface ActionItem {
+  type: 'expand' | 'hire'
+  amount: number
+}
+
+export interface ActionLog {
+  type: string
+  amount: number
+  actual?: number
+  cost: number
+  ready_quarter?: number
+}
+
+export interface ActionResponse {
+  cash: number
+  employees: number
+  cap_count: number
+  actions: ActionLog[]
+}
+
 export interface MarginAccount {
   totalAssets: number
   totalDebt: number

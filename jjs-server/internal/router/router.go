@@ -28,6 +28,7 @@ func New(authH *handler.AuthHandler, playerH *handler.PlayerHandler, companyH *h
 		r.With(middleware.JWT).Get("/player/info", playerH.Info)
 
 		r.With(middleware.JWT).Post("/company/create", companyH.Create)
+		r.With(middleware.JWT).Post("/company/actions", companyH.SubmitActions)
 		r.With(middleware.JWT).Get("/company/state", companyH.State)
 		r.With(middleware.JWT).Get("/company/quarterly", companyH.Quarterly)
 	})

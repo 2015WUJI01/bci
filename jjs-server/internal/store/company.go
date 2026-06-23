@@ -92,6 +92,15 @@ func GetPendingBuildOrders(companyID uint) ([]domain.CapBuildOrder, error) {
 	return orders, nil
 }
 
+func GetPendingUncompletedBuildOrders(companyID uint, quarter int) ([]domain.CapBuildOrder, error) {
+	var orders []domain.CapBuildOrder
+	err := DB.Where("company_id = ? AND ready_quarter <= ? AND completed = ?", companyID, quarter, false).Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	return orders, nil
+}
+
 func CompleteBuildOrder(id uint) error {
 	return DB.Model(&domain.CapBuildOrder{}).Where("id = ?", id).Update("completed", true).Error
 }

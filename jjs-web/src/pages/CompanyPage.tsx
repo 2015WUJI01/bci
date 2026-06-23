@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { api } from '@/api/client'
 import { useCompanyState, usePlayerInfo } from '@/api/queries'
 import { Panel } from '@/components/Panel'
+import type { ActionResponse } from '@/types'
 
 const INDUSTRY_META: Record<string, { name: string; icon: string; desc: string; enabled: boolean }> = {
   tech:          { name: '科技',     icon: '💻', desc: '技术驱动，重研发投入，设备迭代快', enabled: false },
@@ -40,6 +41,12 @@ export function CompanyPage() {
   const [creating, setCreating] = useState(false)
   const [showQuarterly, setShowQuarterly] = useState(false)
   const [error, setError] = useState('')
+  const [showActions, setShowActions] = useState(false)
+  const [actionView, setActionView] = useState<'selection' | 'expand' | 'hire'>('selection')
+  const [actionAmount, setActionAmount] = useState(0)
+  const [actionsSubmitted, setActionsSubmitted] = useState(0)
+  const [submittingActions, setSubmittingActions] = useState(false)
+  const [actionError, setActionError] = useState('')
   const queryClient = useQueryClient()
 
   const playerCash = playerInfo?.cash ?? 100000
@@ -66,6 +73,23 @@ export function CompanyPage() {
       setError(err instanceof Error ? err.message : '创建失败')
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleSubmitAction = async (type: 'expand' | 'hire', amount: number) => {
+    if (!company) return
+    setSubmittingActions(true)
+    setActionError('')
+    try {
+      await api.post<ActionResponse>('/company/actions', { actions: [{ type, amount }] })
+      setActionsSubmitted(prev => prev + 1)
+      setActionView('selection')
+      setActionAmount(0)
+      queryClient.invalidateQueries({ queryKey: ['company'] })
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setSubmittingActions(false)
     }
   }
 
@@ -225,6 +249,13 @@ function DetailItem({ label, value, positive, hint }: {
       ) : (() => {
           const confirmedQ = company.last_quarterly
           const invDelta = confirmedQ ? confirmedQ.prod_qty - confirmedQ.sales_qty : 0
+          const isMfg = company.industry === 'manufacturing'
+          const expUnitCost = isMfg ? 80000 : 120000
+          const hireUnitCost = 3000
+          const maxAmount = Math.floor(company.cash / (actionView === 'expand' ? expUnitCost : hireUnitCost))
+          const cost = actionAmount * (actionView === 'expand' ? expUnitCost : hireUnitCost)
+          const remaining = 3 - actionsSubmitted
+          const canSubmit = actionAmount > 0 && cost <= company.cash && remaining > 0
 
           return (
         <div className="space-y-3">
@@ -292,6 +323,14 @@ function DetailItem({ label, value, positive, hint }: {
                     </span>
                   </div>
                 ) : <div />}
+              </div>
+              <div className="mt-3 pt-3 border-t border-border">
+                <button
+                  className="btn btn-primary btn-full"
+                  onClick={() => { setShowActions(true); setActionView('selection'); setActionAmount(0); setActionError('') }}
+                >
+                  ⚡ 经营行动{actionsSubmitted > 0 ? ` (${actionsSubmitted}/3)` : ''}
+                </button>
               </div>
             </div>
           </Panel>
@@ -412,6 +451,131 @@ function DetailItem({ label, value, positive, hint }: {
                     </div>
                   </section>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {showActions && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              onClick={() => { setShowActions(false); setActionView('selection'); setActionsSubmitted(0) }}
+            >
+              <div
+                className="bg-bg-card border border-border rounded-lg shadow-xl w-full max-w-sm mx-4 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {actionView === 'selection' ? (
+                  <>
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                      <h3 className="text-sm font-bold text-text-primary">
+                        经营行动 · 剩余 {remaining}/3
+                      </h3>
+                      <button
+                        className="text-text-muted hover:text-text-primary transition-colors text-lg leading-none"
+                        onClick={() => { setShowActions(false); setActionsSubmitted(0) }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <button
+                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
+                        onClick={() => { setActionView('expand'); setActionAmount(0); setActionError('') }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">🏭</span>
+                          <span className="text-sm font-semibold text-text-primary">{isMfg ? '新建产线' : '勘探矿脉'}</span>
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          ¥{expUnitCost.toLocaleString()}/{isMfg ? '条' : '次'} · {isMfg ? '1季后投产' : '2季后完工 · 储量随机'}
+                        </div>
+                      </button>
+
+                      <button
+                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
+                        onClick={() => { setActionView('hire'); setActionAmount(0); setActionError('') }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">👥</span>
+                          <span className="text-sm font-semibold text-text-primary">招募员工</span>
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          ¥{hireUnitCost.toLocaleString()}/人 · 预计实招 60%~140%
+                        </div>
+                      </button>
+
+                      {actionsSubmitted >= 3 && (
+                        <p className="text-xs text-text-muted text-center">本季度操作次数已用完</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+                      <button
+                        className="text-text-muted hover:text-text-primary transition-colors text-sm"
+                        onClick={() => { setActionView('selection'); setActionAmount(0); setActionError('') }}
+                      >
+                        ← 返回
+                      </button>
+                      <span className="text-sm font-semibold text-text-primary">
+                        {actionView === 'expand' ? (isMfg ? '新建产线' : '勘探矿脉') : '招募员工'}
+                      </span>
+                    </div>
+
+                    <div className="p-4 space-y-4">
+                      <div>
+                        <div className="flex justify-between text-xs text-text-secondary mb-1">
+                          <span>{actionView === 'expand' ? (isMfg ? '新建产线数量' : '勘探次数') : '招募人数'}</span>
+                          <span className="text-text-primary font-semibold">
+                            {actionAmount.toLocaleString()} {actionView === 'expand' ? (isMfg ? '条' : '次') : '人'}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={maxAmount}
+                          step={1}
+                          value={actionAmount}
+                          onChange={(e) => setActionAmount(Number(e.target.value))}
+                          className="w-full accent-accent-blue"
+                        />
+                        <div className="flex justify-between text-[11px] text-text-muted mt-0.5">
+                          <span>¥{(actionView === 'expand' ? expUnitCost : hireUnitCost).toLocaleString()}/{actionView === 'expand' ? (isMfg ? '条' : '次') : '人'}</span>
+                          {actionView === 'expand' ? (
+                            <span>{isMfg ? '1季后投产' : '2季后完工 · 储量随机（2万~16万单位）'}</span>
+                          ) : (
+                            actionAmount > 0 && (
+                              <span>预计实招 {Math.round(actionAmount * 0.6)}~{Math.round(actionAmount * 1.4)} 人</span>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-text-muted text-center">
+                        成本 <span className={`font-semibold ${cost > company.cash ? 'text-down' : 'text-text-primary'}`}>¥{cost.toLocaleString()}</span>
+                      </div>
+
+                      {actionError && <p className="text-accent-red text-sm text-center">{actionError}</p>}
+
+                      <button
+                        className="btn btn-primary btn-full"
+                        disabled={!canSubmit || submittingActions}
+                        onClick={() => handleSubmitAction(actionView, actionAmount)}
+                      >
+                        {actionAmount === 0
+                          ? '请选择数量'
+                          : cost > company.cash
+                          ? '公司现金不足'
+                          : remaining <= 0
+                          ? '操作次数已用完'
+                          : submittingActions
+                          ? '提交中...'
+                          : '提交'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

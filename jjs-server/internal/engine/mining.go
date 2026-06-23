@@ -48,6 +48,7 @@ func MiningRNG(companyID uint, quarter int, aspect string) *rand.Rand {
 	aspects := map[string]int64{
 		"volatility":  1,
 		"demand_init": 2,
+		"prospect":    3,
 	}
 	seed := int64(companyID)*1_000_000 + int64(quarter)*100 + aspects[aspect]
 	return rand.New(rand.NewSource(seed))

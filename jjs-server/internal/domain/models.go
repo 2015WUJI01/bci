@@ -3,6 +3,7 @@ package domain
 import (
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -68,6 +69,7 @@ type CapBuildOrder struct {
 	gorm.Model
 	CompanyID    uint `gorm:"index;not null"`
 	ReadyQuarter int  `gorm:"not null"`
+	Amount       int  `gorm:"not null;default:1"`
 	Completed    bool `gorm:"not null;default:false"`
 }
 
@@ -91,8 +93,9 @@ type CompanyQuarterly struct {
 	CEOShares       int64     `json:"ceo_shares" gorm:"not null;default:0"`
 	CapCount        int       `json:"cap_count" gorm:"not null;default:0"`
 	Inventory       int64     `json:"inventory" gorm:"not null;default:0"`
-	Demand          int64     `json:"demand" gorm:"not null;default:0"`
-	CreatedAt       time.Time `json:"CreatedAt" gorm:"autoCreateTime"`
+	Demand          int64          `json:"demand" gorm:"not null;default:0"`
+	Actions         datatypes.JSON `json:"actions" gorm:"type:json"`
+	CreatedAt       time.Time      `json:"CreatedAt" gorm:"autoCreateTime"`
 }
 type IndustryProsperity struct {
 	ID         uint      `gorm:"primaryKey;autoIncrement"`
@@ -110,6 +113,14 @@ type AssetLog struct {
 	Balance   float64   `gorm:"not null"`
 	Note      string    `gorm:"type:varchar(200);default:''"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`
+}
+
+type ActionLog struct {
+	Type        string `json:"type"`
+	Amount      int    `json:"amount,omitempty"`
+	Actual      int    `json:"actual,omitempty"`
+	Cost        int64  `json:"cost,omitempty"`
+	ReadyQuarter int   `json:"ready_quarter,omitempty"`
 }
 
 func (Company) TableName() string           { return "companies" }

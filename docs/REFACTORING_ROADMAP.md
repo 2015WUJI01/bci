@@ -19,7 +19,7 @@
 | 阶段 | 内容 | 预估工作量 | 风险 | 目标产出 |
 |------|------|-----------|------|----------|
 | **P1** | 项目骨架与基础设施 | 3-4 天 | 低 | ✅ 已完成 |
-| **P2** | 公司运营 v2 + 个人资产 | 7-9 天 | 中 | AP 行动点系统、董事会/KPI、研发、随机事件、玩家资产 |
+| **P2** | 公司运营 v2 + 个人资产 | 7-9 天 | 中 | ✅ 核心已完成（行业模型、季度结算、扩产/招人行动系统） |
 | **P3** | 核心交易引擎 | 5-7 天 | 高 | 订单簿、撮合、行情、股票交易 |
 | **P4** | AI 交易者系统 | 4-5 天 | 中 | 6 类 Bot 全部实现 |
 | **P5** | 业务系统 | 4-5 天 | 中 | 融资融券、SEC、市场新闻、排行榜 |
@@ -304,10 +304,55 @@ Profit           = Revenue - TotalCost
 - `pages/QuarterlyPage.tsx`：独立历史报表页（路由 `/game/company/quarterly`），无限极滚动加载（50条/页，scroll 事件触发），表格列 季度/营收/利润/总成本/期初现金/期末现金；表格区内滚动（表头 sticky），页高填满可用空间；点击行弹出 Modal 详情——财务摘要移除利润率/成本率，运营指标新增库存变更/开工产能/产能上限，股权数据合并持股比例到 CEO持股
 - `types/index.ts`：`PlayerBasicInfo` 新增 `global_quarter` 字段
 
-### P2.2: AP 行动系统（待 Company 表加 AP/APCap 字段时实现）
+### P2.2: 玩家行动系统 ✅ 完成（2026-06-23）
 
+> **设计简化**: AP 资源点字段被砍掉，改为每季度固定 3 次操作硬限制。董事会/KPI/研发/随机事件留待后续。首批实现扩产 + 招人两个基础动作。并购和转型永久移除。
+
+**行动规则**:
+- 每季度最多 3 次经营操作（`POST /api/company/actions` 提交数组长度 ≤ 3，服务端通过 `CompanyQuarterly.Actions` 中的 `expand`/`hire` 条数做跨请求累计校验）
+- 每次「扩产」= 1 个操作位 + 滑动条选择 N 条/次（按 N × 单价扣现金）→ 创建一条 `CapBuildOrder`（含 `Amount` 字段，`ReadyQuarter = 当前季 + CapBuildQuarters`）
+- 每次「招人」= 1 个操作位 + 滑动条选择 N 人 → `Employees += round(N × random(0.6~1.4))`
+- 资本类动作（分红/回购/营销）暂无 AP 消耗优势，暂不实现
+
+**建造队列结算**（`engine/ticker.go:processBuildQueue`）:
+- 仅在 `finalize=true` 时执行（正式结算），不在预报阶段运行
+- 查 `GetPendingUncompletedBuildOrders`（`ready_quarter <= currentQ AND completed=false`）
+- 逐条标记 completed → `Company.CapCount += Amount`
+- 制造业扩产 Amount 确定；矿业扩产 Amount 由 `ProspectOreReserves(rng)` 在**提交时**随机确定
+
+**新增/变更文件**:
+
+| 文件 | 变更 |
+|------|------|
+| `domain/models.go` | `CapBuildOrder` +`Amount int`；`CompanyQuarterly` +`Actions datatypes.JSON`；新增 `ActionLog` 结构 |
+| `store/company.go` | 新增 `GetPendingUncompletedBuildOrders(companyID, quarter)` |
+| `engine/ticker.go` | 新增 `processBuildQueue()`；`settleManufacturing`/`settleMining` 中 `Updates` 显式 `WHERE id=?` + 包含 `cap_count` |
+| `engine/mining.go` | `MiningRNG` 加入 `"prospect"` 种子键 |
+| `handler/action.go` | **新文件**：`POST /api/company/actions`（含 `countExistingActions` 校验） |
+| `router/router.go` | 注册 `/api/company/actions` |
+
+**API**:
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| POST | `/api/company/actions` | JWT | 提交本季经营操作。Body: `{actions: [{type, amount}]}`，type ∈ {expand, hire}，累计 ≤ 3 次/季 |
+
+**前端**:
+- `CompanyPage.tsx`：仪表盘新增「经营行动」弹窗——按钮放在经营指标面板底部；弹窗分两步（选择操作类型 → 滑动调数量 + 提交）。前端本地计数器追踪已用次数（关弹窗归零），后端做最终校验
+- `types/index.ts`：新增 `ActionItem`, `ActionLog`, `ActionResponse`
+
+**后端**:
 ```
-行动点系统 + 董事会/KPI + 研发 + 随机事件 —— 后续按需逐阶段实现
+jjs-server/internal/
+├── handler/
+│   └── action.go                    # ✅ 行动提交端点
+├── engine/
+│   ├── ticker.go                    # ✅ processBuildQueue + 仅finalize调用
+│   └── mining.go                    # ✅ MiningRNG +prospect
+├── store/
+│   └── company.go                   # ✅ GetPendingUncompletedBuildOrders
+├── domain/
+│   └── models.go                    # ✅ CapBuildOrder.Amount, CQ.Actions, ActionLog
 ```
 
 ```
@@ -341,12 +386,12 @@ internal/engine/
 - ✅ 制造业生产模型 + 季度结算已完成
 - ✅ 矿业生产模型 + 季度结算已完成（2026-06-22，第二个启用行业）
 - ✅ 公司创建 + 行业选择 API 可用
-- ⏳ 季度结算完整跑通（AP 决策 → 董事会考核 → 股价更新）
-- ⏳ 17 个行动全部可执行，效果/约束/冷却/递减正确
-- 研发系统 + 随机事件运转
+- ✅ 扩产/招人行动系统（每季 3 次硬限制，建造队列 仅finalize 处理）（2026-06-23）
+- ⏳ 董事会/KPI 系统（另行设计）
+- ⏳ 研发系统
+- ⏳ 随机事件
 - ✅ 玩家基础信息查询 API 可用 (`GET /api/player/info`)
 - ⏳ 玩家资产查询/变动完整 API（待持仓、交易引擎完成后补充）
-- 用 `simulate_v2.py` 的数值参数交叉验证
 
 ---
 

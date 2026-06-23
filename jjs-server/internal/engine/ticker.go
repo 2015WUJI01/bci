@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"math"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"jjs-server/internal/domain"
@@ -117,6 +119,43 @@ func preGenerateQuarter(companies []domain.Company, quarter int) {
 	slog.Info("pre-generation complete", "companies", len(companies), "quarter", quarter)
 }
 
+func processBuildQueue(c *domain.Company, quarter int) error {
+	orders, err := store.GetPendingUncompletedBuildOrders(c.ID, quarter)
+	if err != nil {
+		return err
+	}
+	if len(orders) == 0 {
+		return nil
+	}
+
+	for _, o := range orders {
+		c.CapCount += o.Amount
+		if err := store.CompleteBuildOrder(o.ID); err != nil {
+			return err
+		}
+	}
+	slog.Info("build queue processed", "company", c.ID, "completed", len(orders), "cap_count", c.CapCount)
+	return nil
+}
+
+func MergeActionLogs(existing datatypes.JSON, extra []domain.ActionLog) (datatypes.JSON, error) {
+	if len(extra) == 0 {
+		return existing, nil
+	}
+	var all []domain.ActionLog
+	if len(existing) > 0 {
+		if err := json.Unmarshal(existing, &all); err != nil {
+			return nil, err
+		}
+	}
+	all = append(all, extra...)
+	data, err := json.Marshal(all)
+	if err != nil {
+		return nil, err
+	}
+	return datatypes.JSON(data), nil
+}
+
 func settleCompanyBaseline(c *domain.Company, quarter int, finalize bool) error {
 	if finalize {
 		if c.LastSettledQuarter >= quarter {
@@ -141,6 +180,12 @@ func settleCompanyBaseline(c *domain.Company, quarter int, finalize bool) error 
 	}
 
 	cfg := Industries[c.Industry]
+
+	if finalize {
+		if err := processBuildQueue(c, quarter); err != nil {
+			return err
+		}
+	}
 
 	if c.Industry == "manufacturing" {
 		return settleManufacturing(c, cfg, prosperity, quarter, false, finalize)
@@ -199,6 +244,7 @@ func settleManufacturing(c *domain.Company, cfg IndustryConfig, prosperity float
 		if err == nil {
 			quarterlyRecord.ID = existing.ID
 			quarterlyRecord.CreatedAt = existing.CreatedAt
+			quarterlyRecord.Actions = existing.Actions
 			if err := tx.Save(&quarterlyRecord).Error; err != nil {
 				tx.Rollback()
 				return err
@@ -220,10 +266,11 @@ func settleManufacturing(c *domain.Company, cfg IndustryConfig, prosperity float
 	}
 
 	if finalize {
-		if err := tx.Model(c).Updates(map[string]interface{}{
+		if err := tx.Model(c).Where("id = ?", c.ID).Updates(map[string]interface{}{
 			"cash":                 float64(newCash),
 			"inventory":            result.Inventory,
 			"demand":               result.Demand,
+			"cap_count":            c.CapCount,
 			"last_settled_quarter": quarter,
 		}).Error; err != nil {
 			tx.Rollback()
@@ -280,6 +327,7 @@ func settleMining(c *domain.Company, cfg IndustryConfig, prosperity float64, qua
 		if err == nil {
 			quarterlyRecord.ID = existing.ID
 			quarterlyRecord.CreatedAt = existing.CreatedAt
+			quarterlyRecord.Actions = existing.Actions
 			if err := tx.Save(&quarterlyRecord).Error; err != nil {
 				tx.Rollback()
 				return err
@@ -301,7 +349,7 @@ func settleMining(c *domain.Company, cfg IndustryConfig, prosperity float64, qua
 	}
 
 	if finalize {
-		if err := tx.Model(c).Updates(map[string]interface{}{
+		if err := tx.Model(c).Where("id = ?", c.ID).Updates(map[string]interface{}{
 			"cash":                 float64(newCash),
 			"inventory":            result.Inventory,
 			"cap_count":            result.OreRemaining,
