@@ -56,6 +56,9 @@ func (t *Ticker) onQuarterTick() {
 
 	slog.Info("quarter tick", "quarter", q)
 
+	// Step 1.5: process pending build orders at the start of the new quarter
+	processAllBuildQueues(int(q))
+
 	// Step 2: prosperity update for the new quarter
 	for id, cfg := range Industries {
 		prev, err := store.LatestProsperity(id)
@@ -136,6 +139,30 @@ func processBuildQueue(c *domain.Company, quarter int) error {
 	}
 	slog.Info("build queue processed", "company", c.ID, "completed", len(orders), "cap_count", c.CapCount)
 	return nil
+}
+
+func processAllBuildQueues(quarter int) {
+	companies, err := store.GetActiveCompanies()
+	if err != nil {
+		slog.Error("processAllBuildQueues: failed to get companies", "error", err)
+		return
+	}
+
+	for i, c := range companies {
+		if i > 0 && i%20 == 0 {
+			time.Sleep(50 * time.Millisecond)
+		}
+		oldCap := c.CapCount
+		if err := processBuildQueue(&c, quarter); err != nil {
+			slog.Error("processAllBuildQueues: failed", "company", c.ID, "error", err)
+			continue
+		}
+		if c.CapCount != oldCap {
+			if err := store.DB.Model(&c).Where("id = ?", c.ID).Update("cap_count", c.CapCount).Error; err != nil {
+				slog.Error("processAllBuildQueues: failed to update cap_count", "company", c.ID, "error", err)
+			}
+		}
+	}
 }
 
 func MergeActionLogs(existing datatypes.JSON, extra []domain.ActionLog) (datatypes.JSON, error) {
@@ -395,6 +422,8 @@ func RecoverSettlements() {
 	if pending > 0 {
 		slog.Info("recovered pending settlements", "count", pending, "quarter", targetQ)
 	}
+
+	processAllBuildQueues(currentQ)
 
 	slog.Info("pre-generating projections for current quarter", "quarter", currentQ)
 	preGenerateQuarter(nil, currentQ)

@@ -586,6 +586,7 @@ Company 表核心字段：
 CapBuildOrder 表（建造队列）：
   CompanyID, ReadyQuarter, Completed
   支持多季度连续扩产：每次扩产插入一行，季度结算时检查到期行
+  建造周期为 0 的行业（banking/tech），创建时 Completed=true 即时生效
 
 CompanyQuarterly 表（季度快照）：
   Revenue, Profit, Cash, Employees, TotalShares, CEOShares, CapCount, Inventory, SludgeLevel

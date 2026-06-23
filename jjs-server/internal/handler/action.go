@@ -121,10 +121,15 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 				CompanyID:    c.ID,
 				ReadyQuarter: readyQuarter,
 				Amount:       capAmount,
+				Completed:    cfg.CapBuildQuarters == 0,
 			}
 			if err := store.CreateCapBuildOrder(order); err != nil {
 				WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "创建建造订单失败"})
 				return
+			}
+
+			if cfg.CapBuildQuarters == 0 {
+				c.CapCount += capAmount
 			}
 			actionLogs = append(actionLogs, domain.ActionLog{
 				Type:         "expand",

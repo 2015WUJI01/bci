@@ -314,9 +314,11 @@ Profit           = Revenue - TotalCost
 - 每次「招人」= 1 个操作位 + 滑动条选择 N 人 → `Employees += round(N × random(0.6~1.4))`
 - 资本类动作（分红/回购/营销）暂无 AP 消耗优势，暂不实现
 
-**建造队列结算**（`engine/ticker.go:processBuildQueue`）:
-- 仅在 `finalize=true` 时执行（正式结算），不在预报阶段运行
-- 查 `GetPendingUncompletedBuildOrders`（`ready_quarter <= currentQ AND completed=false`）
+**建造队列结算**（`engine/ticker.go:processBuildQueue` + `processAllBuildQueues`）:
+- **季度初**：`processAllBuildQueues(newQ)` 在季度推进后、`preGenerateQuarter` 前立即处理 `ready_quarter <= newQ` 的待完成订单，更新 `companies.cap_count`
+- **季度末**：`finalizeQuarter` → `settleCompanyBaseline` 中仍调用 `processBuildQueue` 作为幂等安全网（对已处理订单为无操作）
+- **即时完成**：`CapBuildQuarters == 0` 的行业（banking/tech），提交扩产时 `Completed=true`，`CapCount` 立即生效
+- 查询逻辑：`GetPendingUncompletedBuildOrders`（`ready_quarter <= currentQ AND completed=false`）
 - 逐条标记 completed → `Company.CapCount += Amount`
 - 制造业扩产 Amount 确定；矿业扩产 Amount 由 `ProspectOreReserves(rng)` 在**提交时**随机确定
 
@@ -326,7 +328,7 @@ Profit           = Revenue - TotalCost
 |------|------|
 | `domain/models.go` | `CapBuildOrder` +`Amount int`；`CompanyQuarterly` +`Actions datatypes.JSON`；新增 `ActionLog` 结构 |
 | `store/company.go` | 新增 `GetPendingUncompletedBuildOrders(companyID, quarter)` |
-| `engine/ticker.go` | 新增 `processBuildQueue()`；`settleManufacturing`/`settleMining` 中 `Updates` 显式 `WHERE id=?` + 包含 `cap_count` |
+| `engine/ticker.go` | 新增 `processBuildQueue()`、`processAllBuildQueues()`；`settleManufacturing`/`settleMining` 中 `Updates` 显式 `WHERE id=?` + 包含 `cap_count` |
 | `engine/mining.go` | `MiningRNG` 加入 `"prospect"` 种子键 |
 | `handler/action.go` | **新文件**：`POST /api/company/actions`（含 `countExistingActions` 校验） |
 | `router/router.go` | 注册 `/api/company/actions` |
@@ -386,7 +388,7 @@ internal/engine/
 - ✅ 制造业生产模型 + 季度结算已完成
 - ✅ 矿业生产模型 + 季度结算已完成（2026-06-22，第二个启用行业）
 - ✅ 公司创建 + 行业选择 API 可用
-- ✅ 扩产/招人行动系统（每季 3 次硬限制，建造队列 仅finalize 处理）（2026-06-23）
+- ✅ 扩产/招人行动系统（每季 3 次硬限制，建造队列 季度初处理 + 季度末安全网；banking/tech 即时生效）（2026-06-23）
 - ⏳ 董事会/KPI 系统（另行设计）
 - ⏳ 研发系统
 - ⏳ 随机事件
