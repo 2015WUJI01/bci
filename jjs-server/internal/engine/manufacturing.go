@@ -86,7 +86,7 @@ func SettleManufacturing(
 
 	prevD := float64(prevDemand)
 	demand := prevD * (prosperity + iv)
-	demandCap := prodQty * mfgDemandCapMultiplier
+	demandCap := (prodQty + float64(prevInventory)) * mfgDemandCapMultiplier
 	if demand > demandCap {
 		demand = demandCap
 	}

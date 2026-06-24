@@ -23,9 +23,9 @@ func ProspectOreReserves(rng *rand.Rand) int64 {
 	case roll < 0.70:
 		lo, hi = 20000, 60000
 	case roll < 0.90:
-		lo, hi = 60000, 100000
+		lo, hi = 65000, 110000
 	default:
-		lo, hi = 100000, 160000
+		lo, hi = 110000, 180000
 	}
 	return int64(math.Round(lo + rng.Float64()*(hi-lo)))
 }
@@ -84,7 +84,7 @@ func SellMining(
 
 	prevD := float64(prevDemand)
 	demand := prevD * (prosperity + iv)
-	demandCap := prodQty * miningDemandCapMultiplier
+	demandCap := (prodQty + float64(prevInventory)) * miningDemandCapMultiplier
 	if demand > demandCap {
 		demand = demandCap
 	}
