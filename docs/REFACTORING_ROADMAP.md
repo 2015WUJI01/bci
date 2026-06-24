@@ -20,7 +20,7 @@
 |------|------|-----------|------|----------|
 | **P1** | 项目骨架与基础设施 | 3-4 天 | 低 | ✅ 已完成 |
 | **P2** | 公司运营 v2 + 个人资产 | 7-9 天 | 中 | ✅ 核心已完成（行业模型、季度结算、扩产/招人行动系统） |
-| **P3** | 核心交易引擎 | 5-7 天 | 高 | 🔄 P3.1/P3.2 已完成（数据模型+IPO），P3.3-P3.5 待实现 |
+| **P3** | 核心交易引擎 | 5-7 天 | 高 | ✅ 已完成（撮合引擎+2s tick+K线+完整API） |
 | **P4** | AI 交易者系统 | 4-5 天 | 中 | 6 类 Bot 全部实现 |
 | **P5** | 业务系统 | 4-5 天 | 中 | 融资融券、SEC、市场新闻、排行榜 |
 | **P6** | API + WebSocket | 3-4 天 | 低 | REST + WS 完整可用 |
@@ -393,7 +393,7 @@ internal/engine/
 - ⏳ 研发系统
 - ⏳ 随机事件
 - ✅ 玩家基础信息查询 API 可用 (`GET /api/player/info`)
-- ⏳ 玩家资产查询/变动完整 API（待持仓、交易引擎完成后补充）
+- ✅ 玩家资产查询/变动完整 API（`GET /api/portfolio`，含持仓市值/盈亏/总资产）
 
 ---
 
@@ -494,76 +494,85 @@ Body: { float_ratio: 0.10~0.50 }
 
 **产出**: IPO 端点 + IPO 状态端点 + 前端 IPO 完整交互。
 
-### P3.3: 订单簿与撮合引擎 (1.5 天)
+### P3.3: 订单簿与撮合引擎 ✅ 完成 (2026-06-24)
 
+> **设计简化**: 放弃内存 OrderBook 双写架构，改为 DB 驱动。限价单挂入 orders 表，撮合时直接从 DB 查询对手单并排序匹配，盘口5档通过 SQL GROUP BY 聚合。Handler goroutine 和 Ticker goroutine 各自独立调用 engine 函数，并发安全靠 DB 行级锁。
+
+**实际产出**:
 ```
 internal/engine/
-├── orderbook.go     # 订单簿: bid/ask 排序树 + 盘口五档广播
-├── matching.go      # 撮合: limit进簿 / market扫单 / 价格优先→时间优先
-├── broker.go        # 证券机构扫描: 超时买单释放库存
-└── state.go         # GlobalMarketState: maps[Stock] + RWMutex
+├── matching.go      # ExecuteOrder(db, order): 查对手单→排序→match→事务写入（买卖、限价/市价、冻结/释放、手续费）
+├── broker.go        # ReleaseBrokerInventory(db): 每5tick释放库存到stale buys，BROKER系统账号
+│                    # CancelOrder(db, orderID, playerID): 撤单+退冻资金/股份
+└── trading_ticker.go # (P3.4，含于此完成)
+
+internal/store/
+├── order.go         # CRUD + 按price/seq排序查询 + stale订单查询
+├── trade.go         # 创建成交
+├── holding.go       # upsert + 增减持 + 冻结/解冻（FrozenQty）
+├── stock.go         # List/UpdateOHLCV/SnapshotOrderBook(SQL GROUP BY price LIMIT 5)
+├── candle.go        # UpsertCandleWithTx (ON DUPLICATE KEY UPDATE)
+└── broker.go        # 库存查询 + 扣减
+
+internal/handler/
+├── market.go        # GET market/stocks + market/stock/{symbol} + market/kline/{symbol} + market/orderbook/{symbol}
+└── trade.go         # POST trade/order + DELETE trade/order + GET trade/orders + GET portfolio
 ```
 
-- 限价单挂入 bid/ask 堆（按价格排序 + SeqNum 时间优先）
-- 市价单立即扫最优价位
-- 部分成交处理（FilledQty < Qty → partial，修改剩余量继续）
-- 每次撮合检查：买方现金 ≥ Price×Qty+手续费、卖方可用持仓 ≥ Qty
-- 证券机构库存扫描：每 5 tick 检查未成交超过 10 tick 的买单，按价优先卖出
-- 每笔成交 → 写入 Trade 表 + 更新 Stock 行情 + 聚合 Candle
+**核心设计**:
+- 资金模型: `Cash(可用) / FrozenCash(冻结)`，买单调 `FreezeCash`，成交调 `DeductFrozenCash`，撤单调 `UnfreezeCash`
+- 持仓模型: `Holding.Qty / FrozenQty`，卖单调入冻结，成交扣减，Order 新增 `FrozenAmount` 追踪冻结额
+- 手续费: 买方佣金 0.025%（min ¥5），卖方佣金+印花税 0.1%
+- 撮合: 价格优先→同价时间优先(SeqNum)，限价单受阻价，市价单扫全部
+- 系统账号: `PlayerID="BROKER"` 接收 Broker 卖出资金
 
-**产出**: 订单簿匹配单元测试可过（无做空）。
+**产出**: 引擎+Store+最小API全部可用，无做空。
 
-### P3.4: 主循环与行情 (1.5 天)
+### P3.4: 主循环与行情 ✅ 完成 (2026-06-24)
 
+**实际产出**:
 ```
 internal/engine/
-├── ticker.go        # 2s Ticker: onTick 聚合所有流程
-├── price_update.go  # 价格更新: 短期由 order flow 驱动，长期锚定 V2公式
-├── candle.go        # K线聚合: 40t/150t/600t 三周期
-└── persistence.go   # 批量落盘: Stock/Candle upsert
+└── trading_ticker.go    # TradingTicker: 2s tick goroutine, 每tick更新Change/ChangePercent+蜡烛聚合
 ```
 
-每 tick 流程:
-
+每 tick 流程（2s）:
 ```
-1. 公司季度检查 (cron 5min, 复用 P2)
-2. [P4] AI Bot 下单
-3. 撮合引擎: 匹配买入/卖出
-4. 证券机构扫描: 释放库存
-5. 价格更新: CurrentPrice = 最近一笔成交价
-6. 新季时: Stock.Open/High/Low 重置为当前价, PrevClose = 上季末价
-7. Candle 聚合: 检查是否需要生成新 K 线
-8. 广播: Stock 行情 → WS
-9. 持久化: GORM 批量 upsert Stock + Candle
+1. [每5tick] ReleaseBrokerInventory → 查stale buys → Broker按买价卖出库存
+2. updateAllStockPrices → 重算 Change = CurrentPrice - PrevClose, ChangePercent
+3. aggregateAllCandles → 用当前价更新40t/150t/600t三周期蜡烛
 ```
 
-**产出**: ticker goroutine 完整主循环 + 行情更新 + K 线聚合。
+- 成交量/蜡烛实时更新：每笔成交在 `ExecuteOrder` 中同步调用 `updateCandlesForTrade`，不依赖 tick
+- `PriceTickInterval` 统一为 2s（修改 config.go，对齐设计文档）
+- `TradingTicker` 与季度 `Ticker` 并行运行，各自独立 goroutine
+- 新常量: `BrokerScanTicks=5` / `StaleOrderTicks=10` / `SystemBrokerID="BROKER"`
 
-### P3.5: API 与符号生成 (1 天)
+**产出**: 2s tick goroutine + 行情更新 + K线三周期聚合。
 
-**新增/修改 API**:
+### P3.5: API 与符号生成 ✅ 完成 (2026-06-24)
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/company/ipo` | 发起 IPO |
-| GET | `/api/market/stocks` | 上市股票列表 |
-| GET | `/api/market/stock/{symbol}` | 单股行情 |
-| GET | `/api/market/kline/{symbol}` | K 线数据 |
-| GET | `/api/market/orderbook/{symbol}` | 盘口 |
-| POST | `/api/trade/order` | 下单 |
-| DELETE | `/api/trade/order/{id}` | 撤单 |
-| GET | `/api/portfolio` | 我的持仓/资产 |
-| GET | `/api/trade/orders` | 我的挂单 |
+**全部 API 已就绪**:
 
-**Symbol 生成改为前缀+自增序号**:
+| 方法 | 路径 | 说明 | 文件 |
+|------|------|------|------|
+| POST | `/api/trade/order` | 下单（limit/market, buy/sell） | handler/trade.go |
+| DELETE | `/api/trade/order` | 撤单（Body: order_id） | handler/trade.go |
+| GET | `/api/trade/orders` | 我的挂单（status=open/partial） | handler/trade.go |
+| GET | `/api/market/stocks` | 上市股票列表（基础行情） | handler/market.go |
+| GET | `/api/market/stock/{symbol}` | 单股详情（OHLCV+PE/EPS/NAV+盘口5档） | handler/market.go |
+| GET | `/api/market/kline/{symbol}` | K线数据（?period=150t&limit=100） | handler/market.go |
+| GET | `/api/market/orderbook/{symbol}` | 盘口5档快照（从 Stock 表读取） | handler/market.go |
+| GET | `/api/portfolio` | 持仓列表+总资产（现金+市值） | handler/trade.go |
 
+**Symbol 生成**（已在 P3.1 实现）:
 ```
-行业前缀: tech=TK, finance=FI, manufacturing=MF, mining=MN, consumer=CS, healthcare=YL
+行业前缀: tech=TK, finance=JI, manufacturing=MF, mining=MN, consumer=CS, healthcare=YL
 查询现有最大值 +1: SELECT MAX(symbol) FROM companies WHERE symbol LIKE 'MF%'
 并发: uniqueIndex 兜底 + 重试
 ```
 
-**产出**: 全部交易 API 可用 + Symbol 生成器重写。
+**产出**: 全部 REST 交易 API 可用。
 
 ### P3 产出清单
 
@@ -574,11 +583,11 @@ internal/engine/
 - ✅ Symbol 前缀+自增序号生成 (P3.1)
 - ✅ 创建公司 API: total_shares → investor_shares 输入翻转 (P3.1)
 - ⏳ CEO 减持 action 扩展 (P3.2 遗留)
-- ⏳ 订单簿撮合引擎 (limit/market, 无做空) (P3.3)
-- ⏳ 证券机构库存释放机制 (P3.3)
-- ⏳ 2s tick 主循环 + 行情更新 (锚定 V2 公式) (P3.4)
-- ⏳ K 线 40t/150t/600t 三周期聚合 (P3.4)
-- ⏳ 完整 REST API (行情/下单/撤单/持仓) (P3.5)
+- ✅ 订单簿撮合引擎 (limit/market, 无做空, DB驱动) (P3.3)
+- ✅ 证券机构库存释放机制（BROKER系统账号, 每5tick, stale buys 10tick） (P3.3)
+- ✅ 2s tick 主循环 + 行情更新 (Change/ChangePercent) (P3.4)
+- ✅ K 线 40t/150t/600t 三周期聚合（成交实时更新 + tick兜底） (P3.4)
+- ✅ 完整 REST API (8端点: 行情/下单/撤单/持仓/盘口/K线/挂单) (P3.5)
 
 ---
 
@@ -890,7 +899,9 @@ internal/handler/
 ✅ P2.2 完成 (2026-06-23): 扩产/招人行动系统（每季3次硬限制，建造队列）
 ✅ P3.1 完成 (2026-06-24): 数据模型变更（Company新字段+5个新GORM模型）+ Symbol前缀自增 + 股权翻转
 ✅ P3.2 完成 (2026-06-24): IPO 条件校验 + 发行价计算 + IPO API + 前端完整交互
-Week 3-4:    P3.3-P3.5 订单簿/撮合/主循环/行情/API（待实现）
+✅ P3.3 完成 (2026-06-24): 订单簿撮合引擎（DB驱动，limit/market，冻结/释放，手续费）
+✅ P3.4 完成 (2026-06-24): 2s交易tick（broker释放+价格更新+K线聚合），TradingTicker与季度Ticker并行
+✅ P3.5 完成 (2026-06-24): 完整REST API（8端点：行情/下单/撤单/持仓/盘口/K线/挂单）
 Week 5:      P4 AI 交易者（6 类 Bot）
 Week 5-6:    P5 业务系统（融资、SEC、市场新闻、排行榜）
 Week 6-7:    P6 API + WS（含 v2 公司端点）

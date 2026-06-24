@@ -36,6 +36,44 @@ func GetOrCreatePlayerState(playerID, nickname string) (*domain.PlayerState, err
 	return ps, nil
 }
 
+func FreezeCash(db *gorm.DB, playerID string, amount float64) error {
+	if amount <= 0 {
+		return nil
+	}
+	return db.Model(&domain.PlayerState{}).Where("player_id = ? AND cash >= ?", playerID, amount).
+		Updates(map[string]interface{}{
+			"cash":        gorm.Expr("cash - ?", amount),
+			"frozen_cash": gorm.Expr("frozen_cash + ?", amount),
+		}).Error
+}
+
+func UnfreezeCash(db *gorm.DB, playerID string, amount float64) error {
+	if amount <= 0 {
+		return nil
+	}
+	return db.Model(&domain.PlayerState{}).Where("player_id = ? AND frozen_cash >= ?", playerID, amount).
+		Updates(map[string]interface{}{
+			"cash":        gorm.Expr("cash + ?", amount),
+			"frozen_cash": gorm.Expr("frozen_cash - ?", amount),
+		}).Error
+}
+
+func DeductFrozenCash(db *gorm.DB, playerID string, amount float64) error {
+	if amount <= 0 {
+		return nil
+	}
+	return db.Model(&domain.PlayerState{}).Where("player_id = ? AND frozen_cash >= ?", playerID, amount).
+		Update("frozen_cash", gorm.Expr("GREATEST(frozen_cash - ?, 0)", amount)).Error
+}
+
+func AddCash(db *gorm.DB, playerID string, amount float64) error {
+	if amount <= 0 {
+		return nil
+	}
+	return db.Model(&domain.PlayerState{}).Where("player_id = ?", playerID).
+		Update("cash", gorm.Expr("cash + ?", amount)).Error
+}
+
 func DeductCash(playerID string, amount float64, note string) error {
 	if amount <= 0 {
 		return nil

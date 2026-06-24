@@ -10,7 +10,7 @@ import (
 	"jjs-server/internal/middleware"
 )
 
-func New(authH *handler.AuthHandler, playerH *handler.PlayerHandler, companyH *handler.CompanyHandler) chi.Router {
+func New(authH *handler.AuthHandler, playerH *handler.PlayerHandler, companyH *handler.CompanyHandler, marketH *handler.MarketHandler, tradeH *handler.TradeHandler) chi.Router {
 	r := chi.NewRouter()
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
@@ -33,6 +33,16 @@ func New(authH *handler.AuthHandler, playerH *handler.PlayerHandler, companyH *h
 		r.With(middleware.JWT).Get("/company/ipo/status", companyH.IpoStatus)
 		r.With(middleware.JWT).Get("/company/state", companyH.State)
 		r.With(middleware.JWT).Get("/company/quarterly", companyH.Quarterly)
+
+		r.Get("/market/stocks", marketH.ListStocks)
+		r.Get("/market/stock/{symbol}", marketH.GetStockDetail)
+		r.Get("/market/kline/{symbol}", marketH.GetKline)
+		r.Get("/market/orderbook/{symbol}", marketH.GetOrderBook)
+
+		r.With(middleware.JWT).Post("/trade/order", tradeH.PlaceOrder)
+		r.With(middleware.JWT).Delete("/trade/order", tradeH.CancelOrder)
+		r.With(middleware.JWT).Get("/trade/orders", tradeH.MyOrders)
+		r.With(middleware.JWT).Get("/portfolio", tradeH.Portfolio)
 	})
 
 	r.Group(func(r chi.Router) {

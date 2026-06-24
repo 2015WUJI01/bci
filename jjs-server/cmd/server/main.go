@@ -39,7 +39,9 @@ func main() {
 	authH := &handler.AuthHandler{}
 	playerH := &handler.PlayerHandler{}
 	companyH := &handler.CompanyHandler{}
-	r := router.New(authH, playerH, companyH)
+	marketH := &handler.MarketHandler{}
+	tradeH := &handler.TradeHandler{}
+	r := router.New(authH, playerH, companyH, marketH, tradeH)
 
 	srv := &http.Server{
 		Addr:         ":" + config.AppConfig.Port,
@@ -52,6 +54,10 @@ func main() {
 	ticker := engine.NewTicker()
 	ticker.Start()
 	defer ticker.Stop()
+
+	tradingTicker := engine.NewTradingTicker()
+	tradingTicker.Start()
+	defer tradingTicker.Stop()
 
 	go func() {
 		slog.Info("server starting", "port", config.AppConfig.Port)

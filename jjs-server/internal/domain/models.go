@@ -149,18 +149,19 @@ type Stock struct {
 }
 
 type Order struct {
-	ID        uint      `gorm:"primaryKey;autoIncrement"`
-	StockID   uint      `gorm:"index;not null"`
-	PlayerID  string    `gorm:"type:varchar(36);index;not null"`
-	Type      string    `gorm:"type:varchar(10);not null"`
-	Side      string    `gorm:"type:varchar(10);not null"`
-	Price     int64     `gorm:"not null;default:0"`
-	Qty       int64     `gorm:"not null;default:0"`
-	FilledQty int64     `gorm:"not null;default:0"`
-	Status    string    `gorm:"type:varchar(20);not null;default:'open'"`
-	SeqNum    int64     `gorm:"not null;default:0"`
-	CreatedAt time.Time `gorm:"autoCreateTime"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+	ID           uint      `gorm:"primaryKey;autoIncrement"`
+	StockID      uint      `gorm:"index;not null"`
+	PlayerID     string    `gorm:"type:varchar(36);index;not null"`
+	Type         string    `gorm:"type:varchar(10);not null"`
+	Side         string    `gorm:"type:varchar(10);not null"`
+	Price        int64     `gorm:"not null;default:0"`
+	Qty          int64     `gorm:"not null;default:0"`
+	FilledQty    int64     `gorm:"not null;default:0"`
+	Status       string    `gorm:"type:varchar(20);not null;default:'open'"`
+	SeqNum       int64     `gorm:"not null;default:0"`
+	FrozenAmount float64   `gorm:"not null;default:0"`
+	CreatedAt    time.Time `gorm:"autoCreateTime"`
+	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
 }
 
 type Trade struct {

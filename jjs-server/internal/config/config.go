@@ -68,7 +68,7 @@ func mergeInto(dst, src *Config) {
 
 const (
 	StartingCash          = 100_000.0
-	PriceTickInterval     = 1500 * time.Millisecond
+	PriceTickInterval     = 2 * time.Second
 	LeaderboardInterval   = 7500 * time.Millisecond
 	DBFlushInterval       = 30 * time.Second
 	PriceMin              = 1            // 分 (最小股价, 原 0.0001 円)
@@ -87,4 +87,8 @@ const (
 
 	MaxNicknameLen = 20
 	MinPasswordLen = 3
+
+	BrokerScanTicks  = 5
+	StaleOrderTicks  = 10
+	SystemBrokerID   = "BROKER"
 )
