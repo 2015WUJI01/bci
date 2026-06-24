@@ -8,6 +8,44 @@ import (
 	"jjs-server/internal/domain"
 )
 
+type PeriodStockStats struct {
+	StockID    uint
+	PeriodOpen int64
+	PeriodHigh int64
+	PeriodLow  int64
+	PeriodVol  int64
+}
+
+func GetPeriodStatsForAllStocks(period string) (map[uint]PeriodStockStats, error) {
+	var results []PeriodStockStats
+	err := DB.Raw(`
+		SELECT
+			c.stock_id,
+			c.open AS period_open,
+			c.high AS period_high,
+			c.low AS period_low,
+			c.volume AS period_vol
+		FROM candles c
+		INNER JOIN (
+			SELECT stock_id, MAX(open_time) AS max_time
+			FROM candles
+			WHERE period = ?
+			GROUP BY stock_id
+		) m ON c.stock_id = m.stock_id AND c.open_time = m.max_time
+		WHERE c.period = ?
+	`, period, period).Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	stats := make(map[uint]PeriodStockStats, len(results))
+	for _, r := range results {
+		stats[r.StockID] = r
+	}
+	return stats, nil
+}
+
 func UpsertCandle(stockID uint, period string, openTime time.Time, price int64, qty int64) error {
 	return UpsertCandleWithTx(DB, stockID, period, openTime, price, qty)
 }

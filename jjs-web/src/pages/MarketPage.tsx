@@ -48,8 +48,8 @@ export function MarketPage() {
   const search = useSearch({ from: '/game/market' }) as { symbol?: string }
 
   const { data: listResp } = useQuery<StockListResponse>({
-    queryKey: ['stocks'],
-    queryFn: () => api.get('/market/stocks'),
+    queryKey: ['stocks', '150t'],
+    queryFn: () => api.get('/market/stocks?period=150t'),
   })
   const rawStocks = listResp?.stocks ?? []
 
@@ -58,16 +58,20 @@ export function MarketPage() {
   const stocks = useMemo(() => {
     return rawStocks.map((s) => {
       const ws = wsStocks[s.symbol]
+      const price = ws?.price ?? s.current_price
+      const periodOpen = s.open
+      const change = periodOpen > 0 ? price - periodOpen : (ws?.change ?? s.change)
+      const changePercent = periodOpen > 0 ? (change / periodOpen) * 100 : (ws?.changePercent ?? s.change_percent)
       return {
         symbol: s.symbol,
         name: ws?.name ?? s.symbol,
-        price: ws?.price ?? s.current_price,
-        change: ws?.change ?? s.change,
-        changePercent: ws?.changePercent ?? s.change_percent,
-        open: ws?.open ?? s.open,
-        high: ws?.high ?? s.high,
-        low: ws?.low ?? s.low,
-        volume: ws?.volume ?? s.volume,
+        price,
+        change,
+        changePercent,
+        open: s.open,
+        high: s.high,
+        low: s.low,
+        volume: s.volume,
         pe: ws?.pe ?? 0,
         marketCap: ws?.marketCap ?? 0,
         sharesOutstanding: ws?.sharesOutstanding ?? 0,
@@ -83,6 +87,9 @@ export function MarketPage() {
   const [period, setPeriod] = useState<Period>('60t')
   const [chartType, setChartType] = useState<ChartType>('candle')
   const [tickBuffer, setTickBuffer] = useState<{ time: number; value: number }[]>([])
+  const [showMobileChart, setShowMobileChart] = useState(false)
+
+  const effectivePeriod: Period = chartType === 'realtime' ? '150t' : period
 
   useEffect(() => {
     if (!selectedSymbol) {
@@ -120,11 +127,21 @@ export function MarketPage() {
   })
 
   const { data: klineResp } = useQuery<KlineResponse>({
-    queryKey: ['kline', selectedSymbol, period],
-    queryFn: () => api.get(`/market/kline/${selectedSymbol}?period=${period}`),
+    queryKey: ['kline', selectedSymbol, effectivePeriod],
+    queryFn: () => api.get(`/market/kline/${selectedSymbol}?period=${effectivePeriod}`),
     enabled: !!selectedSymbol,
   })
   const klineData = klineResp?.candles ?? []
+
+  const periodStats = useMemo(() => {
+    if (!klineData.length) return null
+    const sorted = [...klineData].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+    const firstOpen = sorted[0].open
+    const periodHigh = Math.max(...sorted.map((d) => d.high))
+    const periodLow = Math.min(...sorted.map((d) => d.low))
+    const periodVolume = sorted.reduce((sum, d) => sum + d.volume, 0)
+    return { open: firstOpen, high: periodHigh, low: periodLow, volume: periodVolume }
+  }, [klineData])
 
   const currentWs = selectedSymbol ? wsStocks[selectedSymbol] : null
   const currentPrice = currentWs?.price ?? detail?.current_price ?? 0
@@ -133,10 +150,23 @@ export function MarketPage() {
   useEffect(() => {
     if (search.symbol) {
       selectStock(search.symbol)
+      setShowMobileChart(true)
     }
   }, [search.symbol, selectStock])
 
   const navigate = useNavigate()
+
+  const handleStockClick = (symbol: string) => {
+    selectStock(symbol)
+    setShowMobileChart(true)
+    navigate({ to: '/game/market', search: { symbol } })
+  }
+
+  const handleBack = () => {
+    setShowMobileChart(false)
+    selectStock(null)
+    navigate({ to: '/game/market' })
+  }
 
   const handleSort = (key: typeof sortKey) => {
     if (sortKey === key) {
@@ -153,8 +183,8 @@ export function MarketPage() {
   }
 
   return (
-    <div className="h-full flex flex-col sm:flex-row gap-3">
-      <div className="w-full sm:w-80 lg:w-96 flex-shrink-0 flex flex-col min-h-0 max-h-[35vh] sm:max-h-none">
+    <div className="h-full grid grid-cols-1 lg:grid-cols-[minmax(220px,340px)_1fr] gap-3">
+      <div className={`${showMobileChart ? 'hidden' : ''} lg:flex w-full flex flex-col min-h-0 max-h-[35vh] lg:max-h-none`}>
         <Panel title="股票列表" className="flex-1 flex flex-col min-h-0">
           <div className="overflow-auto flex-1">
             <table className="w-full text-xs">
@@ -179,7 +209,7 @@ export function MarketPage() {
                     涨跌<SortArrow col="changePercent" />
                   </th>
                   <th
-                    className="text-right py-2 px-2 cursor-pointer hover:text-text-primary hidden sm:table-cell"
+                    className="text-right py-2 px-2 cursor-pointer hover:text-text-primary hidden lg:table-cell"
                     onClick={() => handleSort('volume')}
                   >
                     量<SortArrow col="volume" />
@@ -196,10 +226,7 @@ export function MarketPage() {
                       className={`cursor-pointer border-b border-border/40 hover:bg-white/[0.03] transition-colors ${
                         isSelected ? 'bg-accent-blue/10' : ''
                       }`}
-                      onClick={() => {
-                        selectStock(s.symbol)
-                        navigate({ to: '/game/market', search: { symbol: s.symbol } })
-                      }}
+                      onClick={() => handleStockClick(s.symbol)}
                     >
                       <td className="py-1.5 px-2">
                         <div className="font-medium text-text-primary">{s.symbol}</div>
@@ -211,7 +238,7 @@ export function MarketPage() {
                       <td className={`text-right py-1.5 px-2 font-mono ${isUp ? 'text-up' : 'text-down'}`}>
                         {formatPercent(s.changePercent)}
                       </td>
-                      <td className="text-right py-1.5 px-2 font-mono text-text-muted hidden sm:table-cell">
+                      <td className="text-right py-1.5 px-2 font-mono text-text-muted hidden lg:table-cell">
                         {formatVolume(s.volume)}
                       </td>
                     </tr>
@@ -223,56 +250,55 @@ export function MarketPage() {
         </Panel>
       </div>
 
-      <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-y-auto sm:overflow-visible">
+      <div className={`${!showMobileChart ? 'hidden' : ''} lg:flex flex flex-col gap-3 min-h-0 overflow-y-auto lg:overflow-visible`}>
         {!selectedSymbol ? (
           <Panel title="股票详情" className="flex-1">
             <div className="p-10 text-center text-text-muted text-sm">选择一个股票查看详情和K线图</div>
           </Panel>
         ) : (
           <>
-            <Panel title={detailName} className="flex-1 flex flex-col min-h-0 overflow-hidden min-h-[420px]">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 px-3 py-2 border-b border-border">
-                {detail && (
-                  <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs flex-wrap">
-                    <span className="text-text-muted">最新</span>
-                    <span className={`font-mono font-bold ${(detail.change ?? 0) >= 0 ? 'text-up' : 'text-down'}`}>
-                      {formatPrice(currentPrice)}
-                    </span>
-                    <span className="text-text-muted hidden sm:inline">
-                      {detail.open ? `开 ${formatPrice(detail.open)}` : ''}
-                      {detail.high ? ` 高 ${formatPrice(detail.high)}` : ''}
-                      {detail.low ? ` 低 ${formatPrice(detail.low)}` : ''}
-                    </span>
-                    <span className="text-text-muted sm:hidden">
-                      O {detail.open ? formatPrice(detail.open) : '-'} H {detail.high ? formatPrice(detail.high) : '-'} L {detail.low ? formatPrice(detail.low) : '-'}
-                    </span>
-                    <span className="text-text-muted">量 {formatVolume(detail.volume)}</span>
-                    {detail.pe > 0 && <span className="text-text-muted">PE {detail.pe.toFixed(1)}</span>}
-                  </div>
-                )}
+            <Panel
+              title={detailName}
+              className="flex-1 flex flex-col min-h-0 overflow-hidden min-h-[420px]"
+              headerPrefix={
+                <button
+                  className="lg:hidden text-accent-blue hover:text-blue-300"
+                  onClick={handleBack}
+                >
+                  ←
+                </button>
+              }
+            >
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-1.5 px-3 py-2 border-b border-border">
+                <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs flex-wrap">
+                  <span className="text-text-muted">最新</span>
+                  <span className={`font-mono font-bold ${((periodStats ? (currentPrice - periodStats.open) : (detail?.change ?? 0)) >= 0) ? 'text-up' : 'text-down'}`}>
+                    {formatPrice(currentPrice)}
+                  </span>
+                  {(periodStats || detail) && (
+                    <>
+                      <span className="text-text-muted hidden lg:inline">
+                        开 {formatPrice(periodStats?.open ?? detail?.open ?? 0)} 高 {formatPrice(periodStats?.high ?? detail?.high ?? 0)} 低 {formatPrice(periodStats?.low ?? detail?.low ?? 0)}
+                      </span>
+                      <span className="text-text-muted lg:hidden">
+                        开 {periodStats?.open != null ? formatPrice(periodStats.open) : (detail?.open ? formatPrice(detail.open) : '-')} 高 {periodStats?.high != null ? formatPrice(periodStats.high) : (detail?.high ? formatPrice(detail.high) : '-')} 低 {periodStats?.low != null ? formatPrice(periodStats.low) : (detail?.low ? formatPrice(detail.low) : '-')}
+                      </span>
+                      <span className="text-text-muted">量 {formatVolume(periodStats?.volume ?? detail?.volume ?? 0)}</span>
+                      {detail?.pe != null && detail.pe > 0 && <span className="text-text-muted">PE {detail.pe.toFixed(1)}</span>}
+                    </>
+                  )}
+                </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  {chartType !== 'realtime' && PERIODS.map((p) => (
-                    <button
-                      key={p}
-                      className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors ${
-                        period === p ? 'bg-accent-blue text-white' : 'text-text-muted hover:text-text-primary'
-                      }`}
-                      onClick={() => setPeriod(p)}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                  <span className="text-border mx-0.5">|</span>
                   <button
-                    className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors ${
-                      chartType === 'candle' ? 'bg-accent-blue text-white' : 'text-text-muted hover:text-text-primary'
+                    className={`px-1 sm:px-1.5 py-0.5 text-[10px] sm:text-xs rounded transition-colors ${
+                      chartType === 'realtime' ? 'bg-accent-blue text-white' : 'text-text-muted hover:text-text-primary'
                     }`}
-                    onClick={() => setChartType('candle')}
+                    onClick={() => setChartType('realtime')}
                   >
-                    K线
+                    实时
                   </button>
                   <button
-                    className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors ${
+                    className={`px-1 sm:px-1.5 py-0.5 text-[10px] sm:text-xs rounded transition-colors ${
                       chartType === 'line' ? 'bg-accent-blue text-white' : 'text-text-muted hover:text-text-primary'
                     }`}
                     onClick={() => setChartType('line')}
@@ -280,13 +306,25 @@ export function MarketPage() {
                     分时
                   </button>
                   <button
-                    className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded transition-colors ${
-                      chartType === 'realtime' ? 'bg-accent-blue text-white' : 'text-text-muted hover:text-text-primary'
+                    className={`px-1 sm:px-1.5 py-0.5 text-[10px] sm:text-xs rounded transition-colors ${
+                      chartType === 'candle' ? 'bg-accent-blue text-white' : 'text-text-muted hover:text-text-primary'
                     }`}
-                    onClick={() => setChartType('realtime')}
+                    onClick={() => setChartType('candle')}
                   >
-                    实时
+                    K线
                   </button>
+                  <span className="text-border mx-0.5">|</span>
+                  {chartType !== 'realtime' && PERIODS.map((p) => (
+                    <button
+                      key={p}
+                      className={`px-1 sm:px-1.5 py-0.5 text-[10px] sm:text-xs rounded transition-colors ${
+                        period === p ? 'bg-accent-blue text-white' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                      onClick={() => setPeriod(p)}
+                    >
+                      {p}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
@@ -294,7 +332,7 @@ export function MarketPage() {
               </div>
             </Panel>
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col lg:flex-row gap-3">
               {detail && (
                 <div className="flex-1">
                   <Panel title="五档盘口" className="h-full">

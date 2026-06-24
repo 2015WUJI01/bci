@@ -58,10 +58,8 @@ export function KlineChart({ data, period, chartType, tickData }: KlineChartProp
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#ef4444',
       downColor: '#10b981',
-      borderColor: '#ef4444',
       borderUpColor: '#ef4444',
       borderDownColor: '#10b981',
-      wickColor: '#ef4444',
       wickUpColor: '#ef4444',
       wickDownColor: '#10b981',
       priceScaleId: 'main',

@@ -51,9 +51,15 @@ func (h *MarketHandler) ListStocks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	period := r.URL.Query().Get("period")
+	var periodStats map[uint]store.PeriodStockStats
+	if period != "" {
+		periodStats, _ = store.GetPeriodStatsForAllStocks(period)
+	}
+
 	list := make([]stockInfo, 0, len(stocks))
 	for _, s := range stocks {
-		list = append(list, stockInfo{
+		info := stockInfo{
 			ID:           s.ID,
 			Symbol:       s.Symbol,
 			CurrentPrice: s.CurrentPrice,
@@ -63,7 +69,17 @@ func (h *MarketHandler) ListStocks(w http.ResponseWriter, r *http.Request) {
 			High:         s.High,
 			Low:          s.Low,
 			Volume:       s.Volume,
-		})
+		}
+
+		if ps, ok := periodStats[s.ID]; ok && ps.PeriodOpen > 0 {
+			info.Open = ps.PeriodOpen
+			info.High = ps.PeriodHigh
+			info.Low = ps.PeriodLow
+			info.Change = s.CurrentPrice - ps.PeriodOpen
+			info.ChangePct = float64(s.CurrentPrice-ps.PeriodOpen) / float64(ps.PeriodOpen) * 100
+		}
+
+		list = append(list, info)
 	}
 
 	WriteJSON(w, http.StatusOK, map[string]any{"stocks": list})

@@ -559,7 +559,7 @@ internal/engine/
 | POST | `/api/trade/order` | 下单（limit/market, buy/sell） | handler/trade.go |
 | DELETE | `/api/trade/order` | 撤单（Body: order_id） | handler/trade.go |
 | GET | `/api/trade/orders` | 我的挂单（status=open/partial） | handler/trade.go |
-| GET | `/api/market/stocks` | 上市股票列表（基础行情） | handler/market.go |
+| GET | `/api/market/stocks` | 上市股票列表（基础行情）。可选 `?period=150t` 返回周期基准 OHLC/涨跌幅（基于 candles 表最新窗口） | handler/market.go |
 | GET | `/api/market/stock/{symbol}` | 单股详情（OHLCV+PE/EPS/NAV+盘口5档） | handler/market.go |
 | GET | `/api/market/kline/{symbol}` | K线数据（?period=150t&limit=100） | handler/market.go |
 | GET | `/api/market/orderbook/{symbol}` | 盘口5档快照（从 Stock 表读取） | handler/market.go |
@@ -628,6 +628,14 @@ internal/handler/
 - 价格单位: 前端输入元 → 提交时 `Math.round(yuan * 100)` 转分
 - K 线周期: 15t(30s) / 60t(120s) / 150t(300s)，实时模式用 WS tick 缓冲零存储
 - 移动端: 股票列表 `max-h-[35vh]`，详情区独立滚动，价格信息垂直排列+缩写
+
+**后续优化 (2026-06-24)**:
+- **响应式断点调整**: 桌面双栏布局断点从 `sm:`(640px) 提升至 `lg:`(1024px)，中等屏宽(640~1023px)使用手机式列表/图表切换模式。左侧列表宽度改为 grid `minmax(220px,340px)`，右侧 `1fr` 自动填满。
+- **详情面板 OHLC 改为周期基准**: 开盘/最高/最低/涨跌幅基于所选 K 线周期计算（由 `effectivePeriod` 控制，实时模式用 150t），不再显示全历史(IPO)基准。工具栏重排为 `[实时] [分时] [K线] | [15t] [60t] [150t]`。
+- **股票列表涨跌改为季度基准**: 前端调用 `/market/stocks?period=150t`，合并逻辑中 OHLC 固定使用 HTTP 周期值，涨跌幅 = `(WS 实时价 - periodOpen) / periodOpen × 100`，不再被 WS 的 IPO 基准值覆盖。
+- **K 线颜色修复**: 移除 `lightweight-charts` v4 API（`borderColor`/`wickColor`），仅使用 v5 方向性 API（`borderUpColor`/`borderDownColor`/`wickUpColor`/`wickDownColor`）。
+- **Panel 组件**: 新增 `headerPrefix` prop 支持标题左侧自定义元素。
+- **后端**: `store/candle.go` 新增 `GetPeriodStatsForAllStocks(period)`，使用 `MAX(open_time)` 取每只股票最新周期窗口的蜡烛 OHLC。
 
 ### P3 产出清单
 
