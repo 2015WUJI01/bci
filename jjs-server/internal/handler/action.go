@@ -31,7 +31,14 @@ type actionResponse struct {
 	Actions   []domain.ActionLog `json:"actions"`
 }
 
-var validActionTypes = map[string]bool{"expand": true, "hire": true}
+var validActionTypes = map[string]bool{
+	"expand":      true,
+	"hire":        true,
+	"layoff":      true,
+	"sell_assets": true,
+}
+
+const assetSellDiscount = 0.75
 
 func actionHireRNG(companyID uint, quarter int) *rand.Rand {
 	seed := int64(companyID)*1_000_000 + int64(quarter)*100 + 99
@@ -86,11 +93,23 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "操作数量必须大于 0"})
 			return
 		}
+		if a.Type == "layoff" && a.Amount > c.Employees {
+			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "裁员人数超过现有员工"})
+			return
+		}
+		if a.Type == "sell_assets" && a.Amount > c.CapCount {
+			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "出售数量超过现有资产"})
+			return
+		}
 		switch a.Type {
 		case "expand":
 			totalCost += float64(a.Amount) * cfg.CapBuildCost
 		case "hire":
 			totalCost += float64(a.Amount) * cfg.HireCost
+		case "layoff":
+			totalCost += float64(a.Amount) * cfg.LaborRate * 3
+		case "sell_assets":
+			// asset sale gives cash, not costs it
 		}
 	}
 
@@ -152,7 +171,7 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 		case "hire":
 			reqAmount := a.Amount
 			rng := actionHireRNG(c.ID, currentQ)
-			ratio := 0.6 + rng.Float64()*0.8
+			ratio := 0.3 + rng.Float64()*0.7
 			actualHired := int(math.Round(float64(reqAmount) * ratio))
 			if actualHired < 1 {
 				actualHired = 1
@@ -165,6 +184,26 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 				Cost:   int64(float64(reqAmount) * cfg.HireCost),
 			})
 			slog.Info("hire completed", "company", c.ID, "requested", reqAmount, "hired", actualHired)
+
+		case "layoff":
+			c.Employees -= a.Amount
+			actionLogs = append(actionLogs, domain.ActionLog{
+				Type:   "layoff",
+				Amount: a.Amount,
+				Cost:   int64(float64(a.Amount) * cfg.LaborRate * 3),
+			})
+			slog.Info("layoff completed", "company", c.ID, "laidOff", a.Amount)
+
+		case "sell_assets":
+			sellCash := float64(a.Amount) * cfg.CapAssetValue * assetSellDiscount
+			c.CapCount -= a.Amount
+			c.Cash += sellCash
+			actionLogs = append(actionLogs, domain.ActionLog{
+				Type:   "sell_assets",
+				Amount: a.Amount,
+				Cost:   int64(-sellCash),
+			})
+			slog.Info("assets sold", "company", c.ID, "amount", a.Amount, "cashReceived", sellCash)
 		}
 	}
 
@@ -316,11 +355,5 @@ func countExistingActions(companyID uint, quarter int) int {
 	if err := json.Unmarshal(qr.Actions, &actions); err != nil {
 		return 0
 	}
-	count := 0
-	for _, a := range actions {
-		if a.Type == "expand" || a.Type == "hire" {
-			count++
-		}
-	}
-	return count
+	return len(actions)
 }

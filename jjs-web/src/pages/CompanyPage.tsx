@@ -81,7 +81,7 @@ export function CompanyPage() {
   const [showQuarterly, setShowQuarterly] = useState(false)
   const [error, setError] = useState('')
   const [showActions, setShowActions] = useState(false)
-  const [actionView, setActionView] = useState<'selection' | 'expand' | 'hire'>('selection')
+  const [actionView, setActionView] = useState<'selection' | 'expand' | 'hire' | 'layoff' | 'sell_assets'>('selection')
   const [actionAmount, setActionAmount] = useState(0)
   const [actionsSubmitted, setActionsSubmitted] = useState(0)
   useEffect(() => {
@@ -140,7 +140,7 @@ export function CompanyPage() {
     }
   }
 
-  const handleSubmitAction = async (type: 'expand' | 'hire', amount: number) => {
+  const handleSubmitAction = async (type: 'expand' | 'hire' | 'layoff' | 'sell_assets', amount: number) => {
     if (!company) return
     setSubmittingActions(true)
     setActionError('')
@@ -316,10 +316,32 @@ function DetailItem({ label, value, positive, hint }: {
           const isMfg = company.industry === 'manufacturing'
           const expUnitCost = isMfg ? 80000 : 120000
           const hireUnitCost = 3000
-          const maxAmount = Math.floor(company.cash / (actionView === 'expand' ? expUnitCost : hireUnitCost))
-          const cost = actionAmount * (actionView === 'expand' ? expUnitCost : hireUnitCost)
+          const layoffUnitCost = 7500
+          const assetSellPrice = isMfg ? 80000 * 0.75 : 2.0 * 0.75
+
+          let maxAmount: number
+          let cost: number
+          let income = 0
+          if (actionView === 'expand') {
+            maxAmount = Math.floor(company.cash / expUnitCost)
+            cost = actionAmount * expUnitCost
+          } else if (actionView === 'hire') {
+            maxAmount = Math.floor(company.cash / hireUnitCost)
+            cost = actionAmount * hireUnitCost
+          } else if (actionView === 'layoff') {
+            maxAmount = Math.min(company.employees, Math.floor(company.cash / layoffUnitCost))
+            cost = actionAmount * layoffUnitCost
+          } else {
+            maxAmount = company.cap_count
+            cost = 0
+            income = actionAmount * assetSellPrice
+          }
+
           const remaining = 3 - actionsSubmitted
-          const canSubmit = actionAmount > 0 && cost <= company.cash && remaining > 0
+          const canSubmit =
+            actionView === 'sell_assets'
+              ? actionAmount > 0 && remaining > 0
+              : actionAmount > 0 && cost <= company.cash && remaining > 0
 
           return (
         <div className="space-y-3">
@@ -631,7 +653,35 @@ function DetailItem({ label, value, positive, hint }: {
                           <span className="text-sm font-semibold text-text-primary">招募员工</span>
                         </div>
                         <div className="text-xs text-text-muted">
-                          ¥{hireUnitCost.toLocaleString()}/人 · 预计实招 60%~140%
+                          ¥{hireUnitCost.toLocaleString()}/岗 · 预计实招 30%~100%
+                        </div>
+                      </button>
+
+                      <button
+                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-red hover:bg-accent-red/5 transition-colors"
+                        onClick={() => { setActionView('layoff'); setActionAmount(0); setActionError('') }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">📉</span>
+                          <span className="text-sm font-semibold text-text-primary">裁员</span>
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          ¥{layoffUnitCost.toLocaleString()}/人 · 补偿 3 倍季度工资
+                        </div>
+                      </button>
+
+                      <button
+                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
+                        onClick={() => { setActionView('sell_assets'); setActionAmount(0); setActionError('') }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">🏷️</span>
+                          <span className="text-sm font-semibold text-text-primary">资产处置</span>
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          {isMfg
+                            ? `¥${Math.round(80000 * 0.75).toLocaleString()}/条 · 折价 75%`
+                            : `¥${(2.0 * 0.75).toFixed(1)}/单位 · 折价 75%`}
                         </div>
                       </button>
 
@@ -650,16 +700,22 @@ function DetailItem({ label, value, positive, hint }: {
                         ← 返回
                       </button>
                       <span className="text-sm font-semibold text-text-primary">
-                        {actionView === 'expand' ? (isMfg ? '新建产线' : '勘探矿脉') : '招募员工'}
+                        {actionView === 'expand' ? (isMfg ? '新建产线' : '勘探矿脉') : actionView === 'hire' ? '招募员工' : actionView === 'layoff' ? '裁员' : '资产处置'}
                       </span>
                     </div>
 
                     <div className="p-4 space-y-4">
                       <div>
                         <div className="flex justify-between text-xs text-text-secondary mb-1">
-                          <span>{actionView === 'expand' ? (isMfg ? '新建产线数量' : '勘探次数') : '招募人数'}</span>
+                          <span>
+                            {actionView === 'expand' ? (isMfg ? '新建产线数量' : '勘探次数')
+                              : actionView === 'hire' ? '招募岗位数'
+                              : actionView === 'layoff' ? '裁员人数'
+                              : isMfg ? '出售产线数' : '出售矿权数'}
+                          </span>
                           <span className="text-text-primary font-semibold">
-                            {actionAmount.toLocaleString()} {actionView === 'expand' ? (isMfg ? '条' : '次') : '人'}
+                            {actionAmount.toLocaleString()}{' '}
+                            {actionView === 'expand' ? (isMfg ? '条' : '次') : actionView === 'sell_assets' ? (isMfg ? '条' : '单位') : '人'}
                           </span>
                         </div>
                         <input
@@ -672,19 +728,37 @@ function DetailItem({ label, value, positive, hint }: {
                           className="w-full accent-accent-blue"
                         />
                         <div className="flex justify-between text-[11px] text-text-muted mt-0.5">
-                          <span>¥{(actionView === 'expand' ? expUnitCost : hireUnitCost).toLocaleString()}/{actionView === 'expand' ? (isMfg ? '条' : '次') : '人'}</span>
                           {actionView === 'expand' ? (
-                            <span>{isMfg ? '1季后投产' : '2季后完工 · 储量随机（2万~16万单位）'}</span>
+                            <>
+                              <span>¥{expUnitCost.toLocaleString()}/{isMfg ? '条' : '次'}</span>
+                              <span>{isMfg ? '1季后投产' : '2季后完工 · 储量随机（2万~16万单位）'}</span>
+                            </>
+                          ) : actionView === 'hire' ? (
+                            <>
+                              <span>¥{hireUnitCost.toLocaleString()}/岗</span>
+                              {actionAmount > 0 && (
+                                <span>预计实招 {Math.round(actionAmount * 0.3)}~{actionAmount} 人</span>
+                              )}
+                            </>
+                          ) : actionView === 'layoff' ? (
+                            <>
+                              <span>¥{layoffUnitCost.toLocaleString()}/人（3倍季度工资）</span>
+                              {actionAmount > 0 && (
+                                <span>当前 {company.employees} 人 → {company.employees - actionAmount} 人</span>
+                              )}
+                            </>
                           ) : (
-                            actionAmount > 0 && (
-                              <span>预计实招 {Math.round(actionAmount * 0.6)}~{Math.round(actionAmount * 1.4)} 人</span>
-                            )
+                            <span>{isMfg ? `¥${Math.round(80000 * 0.75).toLocaleString()}/条 · 当前 ${company.cap_count} 条` : `¥${(2.0 * 0.75).toFixed(1)}/单位 · 当前 ${company.cap_count.toLocaleString()} 单位`}</span>
                           )}
                         </div>
                       </div>
 
                       <div className="text-xs text-text-muted text-center">
-                        成本 <span className={`font-semibold ${cost > company.cash ? 'text-down' : 'text-text-primary'}`}>¥{cost.toLocaleString()}</span>
+                        {actionView === 'sell_assets' ? (
+                          <>出售收入 <span className="font-semibold text-up">¥{income.toLocaleString()}</span></>
+                        ) : (
+                          <>成本 <span className={`font-semibold ${cost > company.cash ? 'text-down' : 'text-text-primary'}`}>¥{cost.toLocaleString()}</span></>
+                        )}
                       </div>
 
                       {actionError && <p className="text-accent-red text-sm text-center">{actionError}</p>}
@@ -696,6 +770,12 @@ function DetailItem({ label, value, positive, hint }: {
                       >
                         {actionAmount === 0
                           ? '请选择数量'
+                          : actionView === 'sell_assets'
+                          ? remaining <= 0
+                            ? '操作次数已用完'
+                            : submittingActions
+                            ? '提交中...'
+                            : '确认出售'
                           : cost > company.cash
                           ? '公司现金不足'
                           : remaining <= 0

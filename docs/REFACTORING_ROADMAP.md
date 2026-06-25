@@ -304,15 +304,19 @@ Profit           = Revenue - TotalCost
 - `pages/QuarterlyPage.tsx`：独立历史报表页（路由 `/game/company/quarterly`），无限极滚动加载（50条/页，scroll 事件触发），表格列 季度/营收/利润/总成本/期初现金/期末现金；表格区内滚动（表头 sticky），页高填满可用空间；点击行弹出 Modal 详情——财务摘要移除利润率/成本率，运营指标新增库存变更/开工产能/产能上限，股权数据合并持股比例到 CEO持股
 - `types/index.ts`：`PlayerBasicInfo` 新增 `global_quarter` 字段
 
-### P2.2: 玩家行动系统 ✅ 完成（2026-06-23）
+### P2.2: 玩家行动系统 ✅ 完成（2026-06-23，扩产/招人）+ ✅ 完成（2026-06-24，裁员/资产处置/招募改革）
 
-> **设计简化**: AP 资源点字段被砍掉，改为每季度固定 3 次操作硬限制。董事会/KPI/研发/随机事件留待后续。首批实现扩产 + 招人两个基础动作。并购和转型永久移除。
+> **设计简化**: AP 资源点字段被砍掉，改为每季度固定 3 次操作硬限制。董事会/KPI/研发/随机事件留待后续。并购和转型永久移除。
+>
+> **扩产概念统一**：探矿是矿业的扩产操作（不是行业特殊操作）。各行业扩产名称不同、机制不同（制造=建产线、矿业=探矿脉），但都是 `type: "expand"` 的扩产行为。
 
 **行动规则**:
-- 每季度最多 3 次经营操作（`POST /api/company/actions` 提交数组长度 ≤ 3，服务端通过 `CompanyQuarterly.Actions` 中的 `expand`/`hire` 条数做跨请求累计校验）
+- 每季度最多 3 次经营操作（`POST /api/company/actions` 提交数组长度 ≤ 3，服务端通过 `CompanyQuarterly.Actions` 条数做跨请求累计校验）
 - 每次「扩产」= 1 个操作位 + 滑动条选择 N 条/次（按 N × 单价扣现金）→ 创建一条 `CapBuildOrder`（含 `Amount` 字段，`ReadyQuarter = 当前季 + CapBuildQuarters`）
-- 每次「招人」= 1 个操作位 + 滑动条选择 N 人 → `Employees += round(N × random(0.6~1.4))`
-- 资本类动作（分红/回购/营销）暂无 AP 消耗优势，暂不实现
+- 每次「招募」= 1 个操作位 + 滑动条选择 N 个岗位 → `Employees += round(N × random(0.3~1.0))`（岗位制：上限=岗位数，下限30%）
+- 每次「裁员」= 1 个操作位 + 滑动条选择 N 人 → `Employees -= N`，成本 = `N × LaborRate × 3`（3倍季度工资补偿），可裁至0人
+- 每次「资产处置」= 1 个操作位 + 滑动条选择 N → `CapCount -= N`，获得现金 = `N × CapAssetValue × 0.75`（折价75%），制造业出售产线、矿业出售矿权
+- 资本类动作（分红/回购/营销）暂无实现
 
 **建造队列结算**（`engine/ticker.go:processBuildQueue` + `processAllBuildQueues`）:
 - **季度初**：`processAllBuildQueues(newQ)` 在季度推进后、`preGenerateQuarter` 前立即处理 `ready_quarter <= newQ` 的待完成订单，更新 `companies.cap_count`
@@ -337,7 +341,7 @@ Profit           = Revenue - TotalCost
 
 | 方法 | 路径 | 认证 | 说明 |
 |------|------|------|------|
-| POST | `/api/company/actions` | JWT | 提交本季经营操作。Body: `{actions: [{type, amount}]}`，type ∈ {expand, hire}，累计 ≤ 3 次/季 |
+| POST | `/api/company/actions` | JWT | 提交本季经营操作。Body: `{actions: [{type, amount}]}`，type ∈ {expand, hire, layoff, sell_assets}，累计 ≤ 3 次/季 |
 
 **前端**:
 - `CompanyPage.tsx`：仪表盘新增「经营行动」弹窗——按钮放在经营指标面板底部；弹窗分两步（选择操作类型 → 滑动调数量 + 提交）。前端本地计数器追踪已用次数（关弹窗归零），后端做最终校验
@@ -389,6 +393,8 @@ internal/engine/
 - ✅ 矿业生产模型 + 季度结算已完成（2026-06-22，第二个启用行业）
 - ✅ 公司创建 + 行业选择 API 可用
 - ✅ 扩产/招人行动系统（每季 3 次硬限制，建造队列 季度初处理 + 季度末安全网；banking/tech 即时生效）（2026-06-23）
+- ✅ 裁员 + 资产处置行动系统，招募改革为岗位制（30%~100%）（2026-06-24）
+- ✅ `IndustryConfig` 新增 `LaborRate` 字段，移除 `CapSpecial`（2026-06-24）
 - ⏳ 董事会/KPI 系统（另行设计）
 - ⏳ 研发系统
 - ⏳ 随机事件
