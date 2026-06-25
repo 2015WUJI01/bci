@@ -220,6 +220,9 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if req.Industry == "manufacturing" {
 		company.Demand = engine.InitialDemand(company.ID, ind.StartingEmployees)
+		if err := store.DB.Model(company).Update("demand", company.Demand).Error; err != nil {
+			slog.Error("update initial demand failed", "error", err)
+		}
 
 		prosperity, err := store.LatestProsperity(req.Industry)
 		if err != nil {
@@ -267,19 +270,17 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		if err := store.CreateQuarterly(quarterly); err != nil {
 			slog.Error("create initial quarterly failed", "error", err)
 		}
-
-		company.Cash = newCash
-		company.Inventory = result.Inventory
-		company.Demand = result.Demand
-		company.LastSettledQuarter = currentQuarter
-		if err := store.UpdateCompany(company); err != nil {
-			slog.Error("update company after initial settlement failed", "error", err)
-		}
 	}
 
 	if req.Industry == "mining" {
 		company.CapCount = int(engine.MiningInitialReserves)
 		company.Demand = engine.InitialMiningDemand(company.ID, ind.StartingEmployees)
+		if err := store.DB.Model(company).Updates(map[string]interface{}{
+			"demand":    company.Demand,
+			"cap_count": company.CapCount,
+		}).Error; err != nil {
+			slog.Error("update initial company state failed", "error", err)
+		}
 
 		prosperity, err := store.LatestProsperity(req.Industry)
 		if err != nil {
@@ -326,15 +327,6 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := store.CreateQuarterly(quarterly); err != nil {
 			slog.Error("create initial quarterly failed", "error", err)
-		}
-
-		company.CapCount = result.OreRemaining
-		company.Cash = newCash
-		company.Inventory = result.Inventory
-		company.Demand = result.Demand
-		company.LastSettledQuarter = currentQuarter
-		if err := store.UpdateCompany(company); err != nil {
-			slog.Error("update company after initial settlement failed", "error", err)
 		}
 	}
 
