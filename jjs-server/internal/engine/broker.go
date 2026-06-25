@@ -18,6 +18,8 @@ func ReleaseBrokerInventory(db *gorm.DB) {
 		return
 	}
 
+	slog.Info("broker: scanning", "stocks", len(stocks))
+
 	staleThreshold := time.Now().Add(-time.Duration(config.StaleOrderTicks) * config.PriceTickInterval)
 
 	for _, stock := range stocks {
@@ -31,14 +33,19 @@ func ReleaseBrokerInventory(db *gorm.DB) {
 			continue
 		}
 
+		slog.Info("broker: found stale orders", "stockID", stock.ID, "symbol", stock.Symbol, "currentPrice", stock.CurrentPrice, "inventory", bi.TotalQty, "staleCount", len(staleBuys))
+
 		_ = ensureBrokerPlayerState(db)
 
 		for _, buy := range staleBuys {
 			if bi.TotalQty <= 0 {
+				slog.Info("broker: inventory exhausted", "stockID", stock.ID)
 				break
 			}
 
-			if buy.Price < stock.CurrentPrice*9/10 {
+			priceThreshold := stock.CurrentPrice * 9 / 10
+			if buy.Price < priceThreshold {
+				slog.Info("broker: price below threshold", "stockID", stock.ID, "orderID", buy.ID, "orderPrice", buy.Price, "threshold", priceThreshold)
 				continue
 			}
 
@@ -48,56 +55,58 @@ func ReleaseBrokerInventory(db *gorm.DB) {
 				fillQty = bi.TotalQty
 			}
 			if fillQty <= 0 {
+				slog.Info("broker: zero fill qty", "stockID", stock.ID, "orderID", buy.ID, "unfilled", unfilled)
 				continue
 			}
 
 			tradePrice := buy.Price
+			slog.Info("broker: matching order", "stockID", stock.ID, "orderID", buy.ID, "orderPrice", buy.Price, "fillQty", fillQty)
 
 			err := func() error {
 				tx := db.Begin()
 
-			fillAmountYuan := centsToYuan(tradePrice * fillQty)
-			buyCommission := calcCommission(fillAmountYuan)
+				fillAmountYuan := centsToYuan(tradePrice * fillQty)
+				buyCommission := calcCommission(fillAmountYuan)
 
-			trade := domain.Trade{
-				StockID:     stock.ID,
-				BuyerID:     buy.PlayerID,
-				SellerID:    config.SystemBrokerID,
-				BuyOrderID:  buy.ID,
-				SellOrderID: 0,
-				Price:       tradePrice,
-				Qty:         fillQty,
-				TotalAmount: tradePrice * fillQty,
-				TradeTime:   time.Now(),
-			}
-			if err := tx.Create(&trade).Error; err != nil {
-				tx.Rollback()
-				return err
-			}
+				trade := domain.Trade{
+					StockID:     stock.ID,
+					BuyerID:     buy.PlayerID,
+					SellerID:    config.SystemBrokerID,
+					BuyOrderID:  buy.ID,
+					SellOrderID: 0,
+					Price:       tradePrice,
+					Qty:         fillQty,
+					TotalAmount: tradePrice * fillQty,
+					TradeTime:   time.Now(),
+				}
+				if err := tx.Create(&trade).Error; err != nil {
+					tx.Rollback()
+					return err
+				}
 
-			buyerHolding, err := store.GetOrCreateHolding(tx, buy.PlayerID, stock.ID)
-			if err != nil {
-				tx.Rollback()
-				return err
-			}
-			totalCost := int64(buyerHolding.Qty)*buyerHolding.AvgCost + tradePrice*fillQty
-			buyerHolding.Qty += fillQty
-			if buyerHolding.Qty > 0 {
-				buyerHolding.AvgCost = totalCost / buyerHolding.Qty
-			}
-			if err := tx.Save(buyerHolding).Error; err != nil {
-				tx.Rollback()
-				return err
-			}
+				buyerHolding, err := store.GetOrCreateHolding(tx, buy.PlayerID, stock.ID)
+				if err != nil {
+					tx.Rollback()
+					return err
+				}
+				totalCost := int64(buyerHolding.Qty)*buyerHolding.AvgCost + tradePrice*fillQty
+				buyerHolding.Qty += fillQty
+				if buyerHolding.Qty > 0 {
+					buyerHolding.AvgCost = totalCost / buyerHolding.Qty
+				}
+				if err := tx.Save(buyerHolding).Error; err != nil {
+					tx.Rollback()
+					return err
+				}
 
-			buyCost := fillAmountYuan + buyCommission
-			if err := store.DeductFrozenCash(tx, buy.PlayerID, buyCost); err != nil {
-				tx.Rollback()
-				return nil
-			}
+				buyCost := fillAmountYuan + buyCommission
+				if err := store.DeductFrozenCash(tx, buy.PlayerID, buyCost); err != nil {
+					tx.Rollback()
+					return err
+				}
 				if err := store.UpdateOrderFrozenAmount(tx, buy.ID, buy.FrozenAmount-buyCost); err != nil {
 					tx.Rollback()
-					return nil
+					return err
 				}
 
 				buy.FilledQty += fillQty
@@ -128,13 +137,14 @@ func ReleaseBrokerInventory(db *gorm.DB) {
 					tx.Rollback()
 					return err
 				}
-			updateCandlesForTrade(tx, stock.ID, time.Now(), tradePrice, fillQty)
+				updateCandlesForTrade(tx, stock.ID, time.Now(), tradePrice, fillQty)
 
-			if err := tx.Commit().Error; err != nil {
+				if err := tx.Commit().Error; err != nil {
 					return err
 				}
 
 				bi.TotalQty -= fillQty
+				slog.Info("broker: trade committed", "stockID", stock.ID, "orderID", buy.ID, "price", tradePrice, "qty", fillQty)
 				return nil
 			}()
 
