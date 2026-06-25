@@ -15,9 +15,9 @@ const INDUSTRY_META: Record<string, { name: string; icon: string; desc: string; 
   healthcare:    { name: '医疗',     icon: '💊', desc: '研发周期长，专利护城河，慢热暴利', enabled: false },
 }
 
-const CEO_SHARES = 10000
-const INVESTOR_SHARES_MIN = 10000
-const INVESTOR_SHARES_MAX = 190000
+const CEO_SHARES = 100000
+const INVESTOR_SHARES_MIN = 100000
+const INVESTOR_SHARES_MAX = 1900000
 const INVEST_MIN = 1000
 
 function MetricLabel({ label, value, tooltip }: { label: string; value: string; tooltip: string }) {
@@ -75,8 +75,9 @@ export function CompanyPage() {
   const { data: ipoStatus } = useIpoStatus()
   const [selectedIndustry, setSelectedIndustry] = useState<string>('')
   const [companyName, setCompanyName] = useState('')
-  const [investorShares, setInvestorShares] = useState(50000)
+  const [investorShares, setInvestorShares] = useState(500000)
   const [playerInvestment, setPlayerInvestment] = useState(50000)
+  const [investInitialized, setInvestInitialized] = useState(false)
   const [creating, setCreating] = useState(false)
   const [showQuarterly, setShowQuarterly] = useState(false)
   const [error, setError] = useState('')
@@ -89,6 +90,14 @@ export function CompanyPage() {
       setActionsSubmitted(company.actions_submitted)
     }
   }, [company?.actions_submitted])
+
+  useEffect(() => {
+    if (!investInitialized && playerInfo) {
+      const cash = playerInfo.cash ?? 100000
+      setPlayerInvestment(prev => Math.min(prev, cash))
+      setInvestInitialized(true)
+    }
+  }, [playerInfo, investInitialized])
   const [submittingActions, setSubmittingActions] = useState(false)
   const [actionError, setActionError] = useState('')
   const queryClient = useQueryClient()
@@ -266,14 +275,14 @@ function DetailItem({ label, value, positive, hint }: {
                     type="range"
                     min={INVESTOR_SHARES_MIN}
                     max={INVESTOR_SHARES_MAX}
-                    step={1000}
+                    step={10000}
                     value={investorShares}
                     onChange={(e) => setInvestorShares(Number(e.target.value))}
                     className="w-full accent-accent-blue"
                   />
                   <div className="flex justify-between text-[11px] text-text-muted mt-0.5">
-                    <span>1万</span>
-                    <span>19万</span>
+                    <span>10万</span>
+                    <span>190万</span>
                   </div>
                 </div>
               </div>

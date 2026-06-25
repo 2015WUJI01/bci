@@ -149,12 +149,12 @@ func (h *CompanyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.InvestorShares < 10000 || req.InvestorShares > 200000 {
-		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "投资方股数需在 1万 到 20万 之间"})
+	if req.InvestorShares < 100000 || req.InvestorShares > 1900000 {
+		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "投资方股数需在 10万 到 190万 之间"})
 		return
 	}
 
-	ceoShares := int64(10000)
+	ceoShares := int64(100000)
 	totalShares := ceoShares + req.InvestorShares
 	ownRatio := float64(ceoShares) / float64(totalShares)
 	if ownRatio < 0.05 {
