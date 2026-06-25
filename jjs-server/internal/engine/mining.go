@@ -88,7 +88,7 @@ func SellMining(
 	if demand > demandCap {
 		demand = demandCap
 	}
-	demandInt := int64(math.Round(math.Max(demand, 0)))
+	demandInt := int64(math.Ceil(math.Max(demand, 0)))
 
 	salesQty := math.Min(prodQty+float64(prevInventory), float64(demandInt))
 

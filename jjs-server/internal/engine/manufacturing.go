@@ -96,7 +96,7 @@ func SettleManufacturing(
 		marketingEffect := marketingRNG.Float64()*(mfgMarketingMax-mfgMarketingMin) + mfgMarketingMin
 		demand += marketingEffect
 	}
-	demandInt := int64(math.Round(math.Max(demand, 0)))
+	demandInt := int64(math.Ceil(math.Max(demand, 0)))
 
 	linesNeeded := math.Ceil(maxWorkerOutput / mfgLineCeiling)
 	activeLines := int(math.Min(linesNeeded, float64(capCount)))
