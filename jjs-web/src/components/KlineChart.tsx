@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import {
   createChart,
   CandlestickSeries,
@@ -30,7 +30,7 @@ export function KlineChart({ data, period, chartType, tickData }: KlineChartProp
   const volumeRef = useRef<any>(null)
   const fittedRef = useRef(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!containerRef.current) return
 
     const chart = createChart(containerRef.current, {
@@ -108,10 +108,15 @@ export function KlineChart({ data, period, chartType, tickData }: KlineChartProp
 
   useEffect(() => {
     updateData()
-  }, [data, tickData])
+  }, [data])
+
+  useEffect(() => {
+    updateData()
+  }, [tickData])
 
   function updateData() {
     if (!candleRef.current || !lineRef.current || !volumeRef.current) return
+    if (chartType !== 'realtime' && data.length === 0) return
 
     if (chartType === 'realtime' && tickData && tickData.length > 0) {
       candleRef.current.setData([])

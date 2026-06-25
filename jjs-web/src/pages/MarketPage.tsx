@@ -328,7 +328,13 @@ export function MarketPage() {
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
-                <KlineChart data={klineData} period={period} chartType={chartType} tickData={tickBuffer} />
+                {klineData.length > 0 ? (
+                  <KlineChart data={klineData} period={period} chartType={chartType} tickData={tickBuffer} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-text-muted text-sm" style={{ minHeight: 400 }}>
+                    加载中...
+                  </div>
+                )}
               </div>
             </Panel>
 
