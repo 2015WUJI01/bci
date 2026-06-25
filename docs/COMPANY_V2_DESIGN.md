@@ -597,8 +597,8 @@ PE 并非固定——基准 PE 仅作起点，公司经营表现影响估值：
 ```
 Company 表核心字段：
   CEOID, Symbol, Name, Industry, Cash, Employees, CreatedQuarter, LastSettledQuarter, Status
-  CEOShares      — CEO 持股（固定 10,000 股）
-  InvestorShares — 投资方持股（创建时玩家输入，1万-20万股）
+  CEOShares      — CEO 持股（固定 100,000 股）
+  InvestorShares — 投资方持股（创建时玩家输入，10万-190万股）
   TotalShares    — 总股本 = CEOShares + InvestorShares + PublicFloat（派生字段）
   IpoQuarter     — IPO 季度号（0=未上市，>0 表示已上市）
   PublicFloat    — 流通股（IPO 增发股数，0=未上市）
@@ -624,15 +624,15 @@ CompanyQuarterly 表（季度快照）：
 玩家初始现金: 100,000
 
 创建参数:
-  investor_shares   — 投资方持股数（1万-20万，滑动条）
+  investor_shares   — 投资方持股数（10万-190万，滑动条）
   player_investment — 玩家出资额（1,000-可用现金，滑动条）
 
 固定值:
-  ceo_shares = 10,000 股
+  ceo_shares = 100,000 股
 
 派生值:
-  total_shares  = 10,000 + investor_shares
-  own_ratio     = 10,000 / total_shares          (5%-100%)
+  total_shares  = 100,000 + investor_shares
+  own_ratio     = 100,000 / total_shares          (5%-100%)
   company_cash  = player_investment / own_ratio   (含社会/投资方融资)
   investor_cash = company_cash - player_investment
 
@@ -781,7 +781,7 @@ IPO 增发后:
 
 | 类型 | 来源 | 二级市场可交易？ | 特殊规则 |
 |------|------|----------------|---------|
-| CEO 持股 | 创始人，固定10,000股 | IPO 后锁仓 4 季，之后通过减持 action 释放 | 每年限减持 ≤ TotalShares×5% |
+| CEO 持股 | 创始人，固定100,000股 | IPO 后锁仓 4 季，之后通过减持 action 释放 | 每年限减持 ≤ TotalShares×5% |
 | 投资方持股 | 公司创建时的外部融资方 | 暂不可交易 | 后续可扩展锁仓/减持机制 |
 | 流通股 | IPO 增发 | 可自由交易 | 初始全部进入证券机构 |
 

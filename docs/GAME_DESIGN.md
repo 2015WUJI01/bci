@@ -92,7 +92,7 @@ EPS    = 近4季度平均净利润 / TotalShares
 **股权结构模型：**
 
 ```
-TotalShares = CEOShares(10,000) + InvestorShares(投资方) + PublicFloat(IPO增发流通股)
+TotalShares = CEOShares(100,000) + InvestorShares(投资方) + PublicFloat(IPO增发流通股)
 ```
 
 三类股份各有不同规则：CEO 持股 IPO 后锁定 4 季、投资方持股暂不可交易、流通股在二级市场自由买卖。
