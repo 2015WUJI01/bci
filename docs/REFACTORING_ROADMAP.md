@@ -386,7 +386,7 @@ internal/engine/
 **前端对接**:
 - ✅ `PlayerBasicInfo` 类型 + `usePlayerInfo()` TanStack Query hook
 - ✅ Header 展示现金 / 昵称（优先使用 API 数据）
-- ✅ 注册时自动创建 PlayerState 行（`StartingCash=10,000`）
+- ✅ 注册时自动创建 PlayerState 行（`StartingCash=100,000`）
 
 **P2 产出清单（整体目标）**:
 - ✅ 6 行业全部参数配置完成
