@@ -229,7 +229,7 @@ func ipoCheckConditions(company *domain.Company, currentQ int) (eligible bool, c
 		if lastN[i].Profit > 0 {
 			consecutiveProfit++
 		} else {
-			consecutiveProfit = 0
+			break
 		}
 		annualRevenue += float64(lastN[i].Revenue)
 	}
