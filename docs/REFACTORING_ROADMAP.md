@@ -664,39 +664,54 @@ internal/handler/
 
 ---
 
-## P4: AI 交易者系统 (4-5 天)
+## P4: AI 交易者系统 (4-5 天) ⏳ 设计完成
 
-> **目标**: 重写全部 6 类 AI 交易者，保持与旧版行为一致。
+> **目标**: 100 个 AI 交易者，统一因子评分模板，替代旧版 6 类独立实现。
+>
+> **设计文档**: `docs/AI_TRADER_DESIGN.md`
+>
+> **策略变更**: 不保留旧版 6 类 Bot 各自实现。所有 AI 使用同一模板，差异仅在于 7 种策略权重向量不同。
 
-### 参考旧代码
+### 设计参考
 
-| 旧文件 | 用途 |
-|--------|------|
-| `backend/game_engine.py` → `ai_buy_tick`, `ai_sell_tick` | Market Maker |
-| `backend/game_engine.py` → `init_npcs` 及 NPC 策略 | NPC 交易者 |
-| `backend/game_engine.py` → `init_retail_investors` | 散户 |
-| `backend/game_engine.py` → Quant/NationalTeam/Institution/HotMoney | 量化/国家队/机构/游资 |
-| `backend/game_engine.py` → `Zhuangjia` 类 | 庄家 4 阶段 |
+| 文件 | 用途 |
+|------|------|
+| `docs/AI_TRADER_DESIGN.md` | 完整设计（权重矩阵、因子公式、生命周期、情绪指数） |
+| `backend/game_engine.py` → `_compute_signal` / NPC / retail / quant loops | 旧版行为参考（已废弃） |
 
 ### 目录结构
 
 ```
 internal/engine/bots/
-├── bot.go                         # Bot 接口定义
-├── market_maker.go                # 做市商
-├── npc.go                         # NPC (100 个, 5 策略)
-├── retail.go                      # 散户 (100 个)
-├── quant.go                       # 量化基金 + 国家队 + 机构 + 游资
-└── zhuangjia.go                   # 庄家 (吸筹/拉升/出货/砸盘)
+├── ai_trader.go     # AiTrader struct + Strategy 权重预设 + 初始化
+├── factors.go       # 12 因子计算（6 理性 + 5 行为 + 1 噪声）
+├── scheduler.go     # ScheduleTick: 分层耗时日志 + 情绪指数更新
+├── lifecycle.go     # 零持仓初始化 + 枯竭退出 + 新生补充
+├── sentiment.go     # 市场情绪指数计算 + EMA 平滑
+└── metrics.go       # BotMetrics 实时计数器 + TraderStats
 ```
 
 ### 设计要点
 
-- 每个 Bot 类型一个 `goroutine`，通过 channel 接收行情更新
-- 与主循环 ticker 通过 channel 同步，不直接调函数
-- NPC 数量从旧代码配置读取（默认 100）
-- 庄家 4 阶段状态机用枚举类型
-- 每 tick 所有 Bot 并行运行（goroutine），主循环等待全部完成后进入撮合
+- **统一因子模型**：12 因子 × 策略权重 → 综合信号（不区分类别，无 goroutine 每 Bot）
+- **每 tick 同步调度**：到期 AI → 采 20% 股票 → 算信号 → 限价下单，带分层耗时日志
+- **基本面锚定**：市场加权平均理性权重 53%，非理性行为产生波动但不脱锚
+- **市场情绪指数**：Information Cascade 模型，15% 跨 AI 情绪传导
+- **自循环生命周期**：零持仓起步，资金耗尽退出，每 100tick 补充至 100 人
+- **庄家已移除**：4 阶段操纵留给玩家手动执行
+- **复用现有基础设施**：PlayerState + Holding 表，ExecuteOrder + 订单簿撮合
+
+### AI 策略分布（100 个）
+
+| 策略 | 数量 | 理性权重 | 风格 |
+|------|:---:|:---:|------|
+| value | 20 | 75% | 低估+基本面 |
+| growth | 17 | 80% | 增长驱动 |
+| momentum | 14 | 0% | 追涨杀跌 |
+| contrarian | 12 | 25% | 逆向操作 |
+| balanced | 23 | 50% | 多因子均衡 |
+| national | 3 | 55% | 托市+价值 |
+| noise | 11 | 30% | 纯随机 |
 
 ---
 

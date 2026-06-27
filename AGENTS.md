@@ -5,7 +5,7 @@
 - **Legacy (do not modify)**: `backend/` (Python+FastAPI+SQLite) and `frontend/` (vanilla JS). These are dead code for reference only.
 - **New backend**: `jjs-server/` — Go 1.24, chi router, GORM+MySQL, JWT+bcrypt.
 - **New frontend**: `jjs-web/` — React 18 + TypeScript + Vite + Tailwind CSS + Zustand + TanStack Query/Router + 底部 Dock 导航。
-- **Rewrite plan**: `docs/REFACTORING_ROADMAP.md` — 8 phases. Currently at P2 start (路由/Dock 已完成，Auth 可用，5 条游戏路由就绪)。
+- **Rewrite plan**: `docs/REFACTORING_ROADMAP.md` — 8 phases. Currently at P4 start (AI 交易者系统设计已完成，待实现)。
 
 ## AI Agent Workflow Rules
 
@@ -16,6 +16,7 @@
 1. **Always** read `docs/REFACTORING_ROADMAP.md` first — check the current phase, what's completed (✅) and what's pending (⏳).
 2. Read design docs relevant to the task domain:
    - Company/operations → `docs/COMPANY_V2_DESIGN.md`
+   - AI trading system → `docs/AI_TRADER_DESIGN.md`
    - UI/styling → `docs/UI_STYLE_GUIDE.md`
    - Architecture overview → `docs/ARCHITECTURE.md`
    - Game mechanics → `docs/GAME_DESIGN.md`
