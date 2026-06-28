@@ -326,7 +326,7 @@ export function MarketPage() {
                     <div className="flex flex-col text-xs font-mono p-2">
                       {detail.asks.slice(0, 5).reverse().map((l, i) => (
                         <div key={`ask-${i}`} className="flex justify-between py-0.5">
-                          <span className="text-down">卖{5 - i}</span>
+                          <span className="text-down">卖{detail.asks.slice(0, 5).length - i}</span>
                           <span className="text-text-muted">{formatPrice(l.price)}</span>
                           <span className="text-text-secondary">{l.volume.toLocaleString()}</span>
                         </div>
