@@ -1,3 +1,12 @@
+export interface CandleSnapshot {
+  time: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
 export interface StockInfo {
   symbol: string
   name: string
@@ -9,6 +18,7 @@ export interface StockInfo {
   sharesOutstanding: number
   eps: number
   tick: number
+  candles?: Record<string, CandleSnapshot>
 }
 
 export interface StockDetailResponse {
@@ -93,6 +103,19 @@ export interface PortfolioState {
   totalAssets: number
   totalPnl: number
   totalPnlPercent: number
+}
+
+export interface PortfolioUpdateData {
+  cash: number
+  frozenCash: number
+  holdings: Holding[]
+}
+
+export interface OrderBookUpdate {
+  [symbol: string]: {
+    bids: { price: number; volume: number }[]
+    asks: { price: number; volume: number }[]
+  }
 }
 
 export interface PlayerInfo {

@@ -19,6 +19,8 @@ export function Header({ cash, nickname: playerNickname, globalQuarter }: Header
   const wsLatency = useGameStore((s) => s.wsLatency)
   const tickCountdown = useGameStore((s) => s.tickCountdown)
   const playerCount = useGameStore((s) => s.playerCount)
+  const wsCash = useGameStore((s) => s.cash)
+  const displayCash = wsCash ?? cash
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -100,7 +102,7 @@ export function Header({ cash, nickname: playerNickname, globalQuarter }: Header
         </div>
 
         <span className="text-lg font-bold tracking-wide tabular-nums text-text-primary whitespace-nowrap">
-          {cash != null ? `¥${cash.toLocaleString()}` : '¥--'}
+          {displayCash != null ? `¥${displayCash.toLocaleString()}` : '¥--'}
         </span>
       </div>
     </header>

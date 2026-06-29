@@ -5,11 +5,7 @@ import { Dock } from '@/components/Dock'
 import { useGameStore } from '@/stores/gameStore'
 import { ws } from '@/api/ws'
 import { usePlayerInfo } from '@/api/queries'
-import type { WsMessage, StockInfo } from '@/types'
-
-interface HoldingsUpdate {
-  holdings: import('@/types').Holding[]
-}
+import type { WsMessage, StockInfo, PortfolioUpdateData } from '@/types'
 
 export function GameLayout() {
   const { data: playerInfo } = usePlayerInfo()
@@ -17,6 +13,8 @@ export function GameLayout() {
   const setCurrentTick = useGameStore((s) => s.setCurrentTick)
   const updateStock = useGameStore((s) => s.updateStock)
   const updateHoldings = useGameStore((s) => s.updateHoldings)
+  const setCash = useGameStore((s) => s.setCash)
+  const setFrozenCash = useGameStore((s) => s.setFrozenCash)
 
   useEffect(() => {
     ws.connect()
@@ -30,9 +28,15 @@ export function GameLayout() {
     })
 
     const unsubPortfolio = ws.on('portfolio_update', (msg: WsMessage) => {
-      const data = msg.data as HoldingsUpdate
+      const data = msg.data as PortfolioUpdateData
       if (data.holdings) {
         updateHoldings(data.holdings)
+      }
+      if (data.cash !== undefined) {
+        setCash(data.cash)
+      }
+      if (data.frozenCash !== undefined) {
+        setFrozenCash(data.frozenCash)
       }
     })
 
@@ -41,7 +45,7 @@ export function GameLayout() {
       unsubPortfolio()
       ws.disconnect()
     }
-  }, [setTickCountdown, setCurrentTick, updateStock, updateHoldings])
+  }, [setTickCountdown, setCurrentTick, updateStock, updateHoldings, setCash, setFrozenCash])
 
   return (
     <div className="flex flex-col h-screen">

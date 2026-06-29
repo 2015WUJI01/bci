@@ -67,18 +67,19 @@ func (t *TradingTicker) onTick() {
 		go ReleaseBrokerInventory(store.DB)
 	}
 
-	t.aggregateAllCandles()
+	candlesByStock := t.aggregateAllCandles()
 
 	if t.botRunner != nil {
 		t.botRunner.ScheduleTick(store.DB)
 	}
 
 	if t.hub != nil {
-		t.broadcastPriceUpdate()
+		t.broadcastPriceUpdate(candlesByStock)
+		t.broadcastOrderBooks()
 	}
 }
 
-func (t *TradingTicker) broadcastPriceUpdate() {
+func (t *TradingTicker) broadcastPriceUpdate(candlesByStock map[uint]map[string]domain.Candle) {
 	stocks, err := store.ListStocks()
 	if err != nil {
 		return
@@ -94,20 +95,23 @@ func (t *TradingTicker) broadcastPriceUpdate() {
 		companyMap[companies[i].Symbol] = &companies[i]
 	}
 
-	msg := ws.BuildPriceUpdate(stocks, companyMap, t.tickCount)
+	msg := ws.BuildPriceUpdate(stocks, companyMap, t.tickCount, candlesByStock)
 	t.hub.Broadcast(msg)
 }
 
-func (t *TradingTicker) aggregateAllCandles() {
+func (t *TradingTicker) aggregateAllCandles() map[uint]map[string]domain.Candle {
 	stocks, err := store.ListStocks()
 	if err != nil {
-		return
+		return nil
 	}
+
+	candlesByStock := make(map[uint]map[string]domain.Candle, len(stocks))
 
 	for _, s := range stocks {
 		if s.CurrentPrice <= 0 {
 			continue
 		}
+		periodCandles := make(map[string]domain.Candle, 3)
 		for _, period := range []struct {
 			name    string
 			seconds int64
@@ -117,14 +121,46 @@ func (t *TradingTicker) aggregateAllCandles() {
 			{"150t", 300},
 		} {
 			openTime := candleOpenTime(time.Now(), period.seconds)
-			if err := store.UpsertCandle(s.ID, period.name, openTime, s.CurrentPrice, 0); err != nil {
+			candle, err := store.UpsertCandle(s.ID, period.name, openTime, s.CurrentPrice, 0)
+			if err != nil {
 				slog.Error("candle upsert failed", "stockID", s.ID, "period", period.name, "error", err)
+				continue
 			}
+			periodCandles[period.name] = candle
 		}
+		candlesByStock[s.ID] = periodCandles
 	}
+	return candlesByStock
 }
 
 func candleOpenTime(t time.Time, periodSecs int64) time.Time {
 	unix := t.Unix()
 	return time.Unix(unix-(unix%periodSecs), 0).UTC()
+}
+
+func (t *TradingTicker) broadcastOrderBooks() {
+	stocks, err := store.ListStocks()
+	if err != nil {
+		return
+	}
+
+	books := make(map[string]struct {
+		Bids []store.OrderBookLevel
+		Asks []store.OrderBookLevel
+	}, len(stocks))
+	for _, s := range stocks {
+		bids, asks, err := store.GetOrderBook(s.ID)
+		if err != nil {
+			continue
+		}
+		books[s.Symbol] = struct {
+			Bids []store.OrderBookLevel
+			Asks []store.OrderBookLevel
+		}{bids, asks}
+	}
+	if len(books) == 0 {
+		return
+	}
+	msg := ws.BuildOrderBookSnapshot(books)
+	t.hub.Broadcast(msg)
 }

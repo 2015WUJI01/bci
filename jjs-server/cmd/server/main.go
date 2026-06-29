@@ -72,6 +72,11 @@ func main() {
 		hub.SendToPlayer(playerID, msg)
 	}
 
+	engine.OnTradeRecorded = func(symbol string, price, qty int64) {
+		msg := ws.BuildTradeTapeEntry(symbol, price, qty, time.Now())
+		hub.Broadcast(msg)
+	}
+
 	authH := &handler.AuthHandler{}
 	playerH := &handler.PlayerHandler{}
 	companyH := &handler.CompanyHandler{}

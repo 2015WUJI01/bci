@@ -412,4 +412,37 @@ frontend/src/
    - 写主表用 `tx.Model(c).Updates(map[string]interface{}{...})` 而非 raw SQL
    - 更新已有季报时必须保留 `CreatedAt = existing.CreatedAt`
 3. **避免 raw SQL 与 GORM 混用** — `tx.Exec` 的参数绑定可能与 GORM 事务行为不一致，统一用 `tx.Model().Updates()` 更可靠
+
+---
+
+## 新系统 WS 消息规范 (Go + React, 2026-06-29)
+
+### 消息类型总览
+
+| 类型 | 触发时机 | 目标 | 负载 |
+|------|----------|------|------|
+| `price_update` | 每 2s tick | 广播全量 | `{ [symbol]: { price, change, changePercent, candles: { "15t"/"60t"/"150t": { time, open, high, low, close, volume } } }, tick }` |
+| `portfolio_update` | 成交时 + broker | 单播受影响玩家 | `{ cash, frozenCash, holdings: [{ symbol, qty, costPrice, currentPrice, marketValue, pnl, pnlPercent }] }` |
+| `orderbook` | 每 2s tick | 广播全量 | `{ [symbol]: { bids: [{ price, volume }], asks: [{ price, volume }] } }` |
+| `trade_tape` | 每笔成交 | 广播全量 | `{ symbol, price, qty, time }` |
+
+### 回调机制
+
+```
+matching.go / broker.go
+  └── OnTradeExecuted(playerID, "") → hub.SendToPlayer (portfolio_update)
+  └── OnTradeRecorded(symbol, price, qty) → hub.Broadcast (trade_tape)
+```
+
+### 前端消费
+
+| 页面 | 数据源 | 机制 |
+|------|--------|------|
+| Header 资金 | `gameStore.cash` (WS) → fallback `playerInfo.cash` (REST) | WS 优先 |
+| PortfolioPage 资金 | `gameStore.cash` (WS) → fallback `portfolio.cash` (REST) | WS 优先 |
+| PortfolioPage 持仓 | REST `.holdings[]` + `gameStore.stocks[symbol].price` (WS) → 本地计算市值/盈亏 | 混合 |
+| MarketPage 股票列表 | REST `/stocks?period=150t` + `gameStore.stocks` (WS) → 本地合并涨跌幅 | 混合 |
+| MarketPage 五档盘口 | `liveOrderBooks[selectedSymbol]` (WS, 每2s) → fallback `detail.bids/asks` (REST) | WS 优先 |
+| MarketPage K线图 | REST `kline` + `gameStore.stocks[symbol].candles[period]` (WS) → 本地合并ASC去重 | 混合 |
+| MarketPage 分时图 | `tickBuffer` (WS `price_update` 缓冲, 300点) | WS 独占 |
 ```

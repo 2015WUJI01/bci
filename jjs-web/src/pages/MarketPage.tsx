@@ -7,7 +7,7 @@ import { useGameStore } from '@/stores/gameStore'
 import { TradeForm } from '@/components/TradeForm'
 import { KlineChart, type ChartType } from '@/components/KlineChart'
 import { Panel } from '@/components/Panel'
-import type { StockDetailResponse, KlineBar, StockInfo } from '@/types'
+import type { StockDetailResponse, KlineBar, StockInfo, OrderBookUpdate } from '@/types'
 
 interface StockListResponse {
   stocks: {
@@ -81,6 +81,7 @@ export function MarketPage() {
   const [chartType, setChartType] = useState<ChartType>('candle')
   const [tickBuffer, setTickBuffer] = useState<{ time: number; value: number }[]>([])
   const [showMobileChart, setShowMobileChart] = useState(!!search.symbol)
+  const [liveOrderBooks, setLiveOrderBooks] = useState<Record<string, { bids: { price: number; volume: number }[]; asks: { price: number; volume: number }[] }>>({})
 
   const effectivePeriod: Period = chartType === 'realtime' ? '150t' : period
 
@@ -102,6 +103,16 @@ export function MarketPage() {
     })
     return unsub
   }, [selectedSymbol])
+
+  useEffect(() => {
+    const unsub = ws.on('orderbook', (msg) => {
+      const data = msg.data as OrderBookUpdate
+      if (data) {
+        setLiveOrderBooks((prev) => ({ ...prev, ...data }))
+      }
+    })
+    return unsub
+  }, [])
 
   const sortedStocks = useMemo(() => {
     const sorted = [...stocks].sort((a, b) => {
@@ -126,15 +137,42 @@ export function MarketPage() {
   })
   const klineData = klineResp?.candles ?? []
 
+  const mergedKlineData = useMemo(() => {
+    if (chartType === 'realtime') return klineData
+    const ascData = [...klineData].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+    const wsSnap = selectedSymbol ? wsStocks[selectedSymbol] : null
+    const periodCandles = wsSnap?.candles?.[effectivePeriod]
+    if (!periodCandles) return ascData
+
+    const wsCandle: KlineBar = {
+      time: new Date(periodCandles.time * 1000).toISOString(),
+      open: periodCandles.open,
+      high: periodCandles.high,
+      low: periodCandles.low,
+      close: periodCandles.close,
+      volume: periodCandles.volume,
+    }
+
+    if (ascData.length === 0) return [wsCandle]
+    const wsTime = new Date(wsCandle.time).getTime()
+    const lastTime = new Date(ascData[ascData.length - 1].time).getTime()
+    if (lastTime === wsTime) {
+      const updated = [...ascData]
+      updated[updated.length - 1] = wsCandle
+      return updated
+    }
+    return [...ascData, wsCandle]
+  }, [klineData, wsStocks, selectedSymbol, effectivePeriod, chartType])
+
   const periodStats = useMemo(() => {
-    if (!klineData.length) return null
-    const sorted = [...klineData].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+    if (!mergedKlineData.length) return null
+    const sorted = [...mergedKlineData].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
     const firstOpen = sorted[0].open
     const periodHigh = Math.max(...sorted.map((d) => d.high))
     const periodLow = Math.min(...sorted.map((d) => d.low))
     const periodVolume = sorted.reduce((sum, d) => sum + d.volume, 0)
     return { open: firstOpen, high: periodHigh, low: periodLow, volume: periodVolume }
-  }, [klineData])
+  }, [mergedKlineData])
 
   const currentWs = selectedSymbol ? wsStocks[selectedSymbol] : null
   const currentPrice = currentWs?.price ?? detail?.current_price ?? 0
@@ -309,8 +347,8 @@ export function MarketPage() {
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
-                {klineData.length > 0 ? (
-                  <KlineChart data={klineData} period={period} chartType={chartType} tickData={tickBuffer} />
+                {mergedKlineData.length > 0 ? (
+                  <KlineChart data={mergedKlineData} period={period} chartType={chartType} tickData={tickBuffer} />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-text-muted text-sm" style={{ minHeight: 400 }}>
                     加载中...
@@ -320,23 +358,26 @@ export function MarketPage() {
             </Panel>
 
             <div className="flex flex-col lg:flex-row gap-3">
-              {detail && (
+              {((selectedSymbol && liveOrderBooks[selectedSymbol]) || detail) && (
                 <div className="flex-1">
                   <Panel title="五档盘口" className="h-full">
                     <div className="flex flex-col text-xs font-mono p-2">
-                      {detail.asks.slice(0, 5).reverse().map((l, i) => (
-                        <div key={`ask-${i}`} className="flex justify-between py-0.5">
-                          <span className="text-down">卖{detail.asks.slice(0, 5).length - i}</span>
-                          <span className="text-text-muted">{formatPrice(l.price)}</span>
-                          <span className="text-text-secondary">{l.volume.toLocaleString()}</span>
-                        </div>
-                      ))}
+                      {(selectedSymbol && liveOrderBooks[selectedSymbol] ? liveOrderBooks[selectedSymbol].asks.slice(0, 5).reverse() : detail!.asks.slice(0, 5).reverse()).map((l, i) => {
+                        const totalLevels = selectedSymbol && liveOrderBooks[selectedSymbol] ? liveOrderBooks[selectedSymbol].asks.slice(0, 5).length : detail!.asks.slice(0, 5).length
+                        return (
+                          <div key={`ask-${i}`} className="flex justify-between py-0.5">
+                            <span className="text-down">卖{totalLevels - i}</span>
+                            <span className="text-text-muted">{formatPrice(l.price)}</span>
+                            <span className="text-text-secondary">{l.volume.toLocaleString()}</span>
+                          </div>
+                        )
+                      })}
                       <div className="flex justify-between py-1 border-y border-border my-1">
                         <span className="text-text-muted">---</span>
                         <span className="font-bold text-text-primary">{formatPrice(currentPrice)}</span>
                         <span className="text-text-muted">---</span>
                       </div>
-                      {detail.bids.slice(0, 5).map((l, i) => (
+                      {(selectedSymbol && liveOrderBooks[selectedSymbol] ? liveOrderBooks[selectedSymbol].bids.slice(0, 5) : detail!.bids.slice(0, 5)).map((l, i) => (
                         <div key={`bid-${i}`} className="flex justify-between py-0.5">
                           <span className="text-up">买{i + 1}</span>
                           <span className="text-text-muted">{formatPrice(l.price)}</span>

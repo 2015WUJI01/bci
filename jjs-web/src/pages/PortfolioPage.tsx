@@ -63,6 +63,7 @@ export function PortfolioPage() {
   const selectStock = useGameStore((s) => s.selectStock)
   const queryClient = useQueryClient()
   const wsStocks = useGameStore((s) => s.stocks)
+  const wsCash = useGameStore((s) => s.cash)
 
   const { data: portfolio } = useQuery<PortfolioResponse>({
     queryKey: portfolioKeys.all,
@@ -92,7 +93,8 @@ export function PortfolioPage() {
       }, 0)
     : 0
 
-  const totalValue = (portfolio?.cash ?? 0) + totalMarketValue / 100
+  const cash = wsCash ?? portfolio?.cash ?? 0
+  const totalValue = cash + totalMarketValue / 100
 
   const handleCancel = async (orderId: number) => {
     try {
@@ -114,7 +116,7 @@ export function PortfolioPage() {
         </Panel>
         <Panel title="现金" className="bg-bg-card">
           <div className="px-3 py-2 text-lg font-bold text-accent-gold font-mono">
-            ¥{fmtYuan(portfolio?.cash ?? 0)}
+            ¥{fmtYuan(cash)}
           </div>
         </Panel>
         <Panel title="持仓市值" className="bg-bg-card">

@@ -598,14 +598,18 @@ internal/handler/
 **消息类型**:
 | 类型 | 频率 | 说明 |
 |------|------|------|
-| `price_update` | 每 2s | 全股票实时价格广播（trading_ticker → hub.Broadcast） |
-| `portfolio_update` | 成交时 | 买卖双方个人持仓刷新（matching → hub.SendToPlayer） |
+| `price_update` | 每 2s | 全股票实时价格广播 + 当前K线OHLC（`candles` 字段含 15t/60t/150t 三周期），trading_ticker → hub.Broadcast |
+| `portfolio_update` | 成交时 | 买卖双方个人持仓+资金刷新（cash/frozenCash/holdings），matching → hub.SendToPlayer |
+| `orderbook` | 每 2s | 全量五档盘口快照（每股票 bids/asks 各 5 档），trading_ticker → hub.Broadcast |
+| `trade_tape` | 成交时 | 逐笔成交记录（symbol/price/qty/time），OnTradeRecorded → hub.Broadcast |
 
 **技术细节**:
 - 前端 WS URL 从 `?player_id=` 改为 `?token=`（JWT 鉴权）
 - 前端 `ws.ts` 已有完整客户端（指数退避重连、pub/sub 分发）
 - Candle/Order/Trade/Holding 模型全部补齐 `json` tag，确保 API 响应字段名一致
 - Stock 模型 bid/ask 字段加显式 `column` tag 修复 GORM 命名不一致问题
+- `OnTradeRecorded` 全局回调（publisher.go）用于广播逐笔成交
+- broker.go 补调 `OnTradeExecuted` 确保证券机构成交后资金实时更新
 
 ### P3.7: 前端交易页面 ✅ 完成 (2026-06-24)
 
@@ -753,11 +757,12 @@ internal/engine/
 > **目标**: 实现全部 REST API 和 WebSocket 端点，与旧版 API 完全兼容。
 > **状态**: REST API 已在 P3.5 全部完成，WebSocket 已在 P3.6 完成。此阶段仅需补充管理端点和待定功能。
 
-### 已完成（P3.5 + P3.6）
+### 已完成（P3.5 + P3.6 + 2026-06-29 实时增强）
 
 - ✅ 全部 8 个 REST API 端点（行情/下单/撤单/持仓/盘口/K线/挂单）
-- ✅ WebSocket Hub/Client + `price_update`(2s) + `portfolio_update`(成交时)
+- ✅ WebSocket Hub/Client + `price_update`(2s, 含K线OHLC) + `portfolio_update`(成交时, 含cash) + `orderbook`(2s) + `trade_tape`(成交时)
 - ✅ 前端 WS 客户端（指数退避重连、pub/sub、JWT token 鉴权）
+- ✅ 前端订单簿实时更新 + K线非实时模式WS合并 + Header/PortfolioPage资金WS优先
 
 ### 参考旧代码 / 设计文档
 
@@ -1012,6 +1017,7 @@ internal/handler/
 ✅ P3.4 完成 (2026-06-24): 2s交易tick（broker释放+价格更新+K线聚合），TradingTicker与季度Ticker并行
 ✅ P3.5 完成 (2026-06-24): 完整REST API（8端点：行情/下单/撤单/持仓/盘口/K线/挂单）
 ✅ P3.6 完成 (2026-06-24): WebSocket Hub/Client + price_update广播 + portfolio_update单播
+✅ P3.6+ 完成 (2026-06-29): orderbook/trade_tape WS推送 + price_update增强(K线OHLC) + 前端实时数据消费（五档盘口/K线合并/资金WS优先）+ broker回调bug修复
 ✅ P3.7 完成 (2026-06-24): MarketPage + PortfolioPage + TradeForm + KlineChart（三模式双面板）
 Week 5:      P4 AI 交易者（6 类 Bot）
 Week 5-6:    P5 业务系统（融资、SEC、市场新闻、排行榜）

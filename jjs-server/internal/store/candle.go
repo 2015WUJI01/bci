@@ -46,11 +46,11 @@ func GetPeriodStatsForAllStocks(period string) (map[uint]PeriodStockStats, error
 	return stats, nil
 }
 
-func UpsertCandle(stockID uint, period string, openTime time.Time, price int64, qty int64) error {
+func UpsertCandle(stockID uint, period string, openTime time.Time, price int64, qty int64) (domain.Candle, error) {
 	return UpsertCandleWithTx(DB, stockID, period, openTime, price, qty)
 }
 
-func UpsertCandleWithTx(db *gorm.DB, stockID uint, period string, openTime time.Time, price int64, qty int64) error {
+func UpsertCandleWithTx(db *gorm.DB, stockID uint, period string, openTime time.Time, price int64, qty int64) (domain.Candle, error) {
 	var candle domain.Candle
 	err := db.Where("stock_id = ? AND period = ? AND open_time = ?", stockID, period, openTime).First(&candle).Error
 	if err != nil {
@@ -64,7 +64,7 @@ func UpsertCandleWithTx(db *gorm.DB, stockID uint, period string, openTime time.
 			Close:    price,
 			Volume:   qty,
 		}
-		return db.Create(&candle).Error
+		return candle, db.Create(&candle).Error
 	}
 
 	if price > candle.High {
@@ -75,7 +75,7 @@ func UpsertCandleWithTx(db *gorm.DB, stockID uint, period string, openTime time.
 	}
 	candle.Close = price
 	candle.Volume += qty
-	return db.Save(&candle).Error
+	return candle, db.Save(&candle).Error
 }
 
 func GetCandles(stockID uint, period string, limit int) ([]domain.Candle, error) {

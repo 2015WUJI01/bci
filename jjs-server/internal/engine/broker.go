@@ -145,6 +145,13 @@ func ReleaseBrokerInventory(db *gorm.DB) {
 
 				bi.TotalQty -= fillQty
 				slog.Info("broker: trade committed", "stockID", stock.ID, "orderID", buy.ID, "price", tradePrice, "qty", fillQty)
+
+				if OnTradeExecuted != nil {
+					OnTradeExecuted(buy.PlayerID, "")
+				}
+				if OnTradeRecorded != nil {
+					OnTradeRecorded(stock.Symbol, tradePrice, fillQty)
+				}
 				return nil
 			}()
 

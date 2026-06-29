@@ -29,7 +29,7 @@ func updateCandlesForTrade(tx *gorm.DB, stockID uint, tradeTime time.Time, price
 		{"150t", 300},
 	} {
 		openTime := candleOpenTime(tradeTime, period.seconds)
-		if err := store.UpsertCandleWithTx(tx, stockID, period.name, openTime, price, qty); err != nil {
+		if _, err := store.UpsertCandleWithTx(tx, stockID, period.name, openTime, price, qty); err != nil {
 			// non-critical, log only
 		}
 	}
@@ -284,6 +284,12 @@ func executeBuy(tx *gorm.DB, order *domain.Order, stock *domain.Stock) (*Execute
 		}
 	}
 
+	if OnTradeRecorded != nil {
+		for _, tr := range trades {
+			OnTradeRecorded(stock.Symbol, tr.Price, tr.Qty)
+		}
+	}
+
 	return &ExecuteResult{
 		OrderID:     order.ID,
 		FilledQty:   order.FilledQty,
@@ -502,6 +508,12 @@ func executeSell(tx *gorm.DB, order *domain.Order, stock *domain.Stock) (*Execut
 		}
 		for pid := range affected {
 			OnTradeExecuted(pid, "")
+		}
+	}
+
+	if OnTradeRecorded != nil {
+		for _, tr := range trades {
+			OnTradeRecorded(stock.Symbol, tr.Price, tr.Qty)
 		}
 	}
 

@@ -19,6 +19,9 @@ interface GameState {
   holdings: Holding[]
   klineData: Record<string, KlineBar[]>
 
+  cash: number | null
+  frozenCash: number | null
+
   panels: {
     trade: boolean
     orderBook: boolean
@@ -43,6 +46,8 @@ interface GameState {
   updateStock: (symbol: string, data: StockInfo) => void
   updateHoldings: (holdings: Holding[]) => void
   setKlineData: (symbol: string, data: KlineBar[]) => void
+  setCash: (cash: number | null) => void
+  setFrozenCash: (frozenCash: number | null) => void
 
   togglePanel: (panel: keyof GameState['panels']) => void
   setPanel: (panel: keyof GameState['panels'], visible: boolean) => void
@@ -63,6 +68,9 @@ export const useGameStore = create<GameState>()((set) => ({
   stocks: {},
   holdings: [],
   klineData: {},
+
+  cash: null,
+  frozenCash: null,
 
   panels: {
     trade: false,
@@ -94,6 +102,9 @@ export const useGameStore = create<GameState>()((set) => ({
   updateHoldings: (holdings) => set({ holdings }),
   setKlineData: (symbol, data) =>
     set((s) => ({ klineData: { ...s.klineData, [symbol]: data } })),
+
+  setCash: (cash) => set({ cash }),
+  setFrozenCash: (frozenCash) => set({ frozenCash }),
 
   togglePanel: (panel) =>
     set((s) => ({ panels: { ...s.panels, [panel]: !s.panels[panel] } })),

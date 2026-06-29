@@ -134,8 +134,18 @@ export function KlineChart({ data, period, chartType, tickData }: KlineChartProp
 
     const sorted = [...data].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
 
+    const deduped: KlineBar[] = []
+    for (const d of sorted) {
+      const t = new Date(d.time).getTime()
+      if (deduped.length > 0 && new Date(deduped[deduped.length - 1].time).getTime() === t) {
+        deduped[deduped.length - 1] = d
+        continue
+      }
+      deduped.push(d)
+    }
+
     if (chartType === 'candle') {
-      candleRef.current.setData(sorted.map((d: KlineBar) => ({
+      candleRef.current.setData(deduped.map((d: KlineBar) => ({
         time: (new Date(d.time).getTime() / 1000) as Time,
         open: d.open / 100,
         high: d.high / 100,
@@ -143,13 +153,13 @@ export function KlineChart({ data, period, chartType, tickData }: KlineChartProp
         close: d.close / 100,
       })))
       lineRef.current.setData([])
-      volumeRef.current.setData(sorted.map((d: KlineBar) => ({
+      volumeRef.current.setData(deduped.map((d: KlineBar) => ({
         time: (new Date(d.time).getTime() / 1000) as Time,
         value: d.volume,
       })))
     } else {
       candleRef.current.setData([])
-      lineRef.current.setData(sorted.map((d: KlineBar) => ({
+      lineRef.current.setData(deduped.map((d: KlineBar) => ({
         time: (new Date(d.time).getTime() / 1000) as Time,
         value: d.close / 100,
       })))
