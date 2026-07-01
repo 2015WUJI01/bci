@@ -106,7 +106,7 @@ const (
 	AiTraderResupplyInterval  = 100
 	AiTraderLiquidationRatio  = 0.75 // 烟蒂清算比例
 	AiTraderSkipProbability   = 0.50 // 每 tick 跳过概率
-	AiTraderPriceJitter       = 0.15 // 预期价 ±15% 个体扰动
+	AiTraderPriceJitter       = 0.10 // 预期价 ±10% 个体扰动
 	AiTraderStopLossBase      = 0.25
 	AiTraderStopLossScale     = 0.60
 	AiTraderCancelDevThreshold = 0.05 // 挂单偏差 > 5% 撤单
