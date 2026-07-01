@@ -18,9 +18,7 @@ func ResetTrader(db *gorm.DB, trader *AiTrader) error {
 		return err
 	}
 	db.Where("player_id = ?", trader.ID).Delete(&domain.Holding{})
-	trader.Strategy = pickWeightedStrategy()
-	trader.CooldownTicks = randomIntRange(config.AiTraderCooldownMin, config.AiTraderCooldownMax)
-	trader.RiskTolerance = randomTolerance()
+	trader.CooldownTicks, trader.RiskTolerance = newTraderParams()
 	trader.CoolDownLeft = 0
 	trader.SpawnedAt = time.Now()
 	return nil
@@ -59,29 +57,29 @@ func RestoreTraders(db *gorm.DB) []*AiTrader {
 		ps, exists := existingMap[id]
 
 		if exists && ps.Cash >= config.AiTraderExitCash {
+			cd, rt := newTraderParams()
 			traders = append(traders, &AiTrader{
 				ID:            id,
-				Strategy:      pickWeightedStrategy(),
-			CooldownTicks: randomIntRange(config.AiTraderCooldownMin, config.AiTraderCooldownMax),
-			RiskTolerance: randomTolerance(),
-			CoolDownLeft:  0,
-			SpawnedAt:     time.Now(),
-		})
-		continue
-	}
-
-	if exists && ps.Cash < config.AiTraderExitCash {
-		holdings, _ := store.GetHoldingsByPlayer(id)
-		totalQty := int64(0)
-		for _, h := range holdings {
-			totalQty += h.Qty
+				CooldownTicks: cd,
+				RiskTolerance: rt,
+				CoolDownLeft:  0,
+				SpawnedAt:     time.Now(),
+			})
+			continue
 		}
-		if totalQty > 0 {
-			traders = append(traders, &AiTrader{
-				ID:            id,
-				Strategy:      pickWeightedStrategy(),
-				CooldownTicks: randomIntRange(config.AiTraderCooldownMin, config.AiTraderCooldownMax),
-					RiskTolerance: randomTolerance(),
+
+		if exists && ps.Cash < config.AiTraderExitCash {
+			holdings, _ := store.GetHoldingsByPlayer(id)
+			totalQty := int64(0)
+			for _, h := range holdings {
+				totalQty += h.Qty
+			}
+			if totalQty > 0 {
+				cd, rt := newTraderParams()
+				traders = append(traders, &AiTrader{
+					ID:            id,
+					CooldownTicks: cd,
+					RiskTolerance: rt,
 					CoolDownLeft:  0,
 					SpawnedAt:     time.Now(),
 				})
@@ -98,15 +96,15 @@ func RestoreTraders(db *gorm.DB) []*AiTrader {
 		db.Model(&domain.PlayerState{}).Where("player_id = ?", id).
 			Updates(map[string]interface{}{"cash": cash, "frozen_cash": 0})
 
+		cd, rt := newTraderParams()
 		traders = append(traders, &AiTrader{
 			ID:            id,
-			Strategy:      pickWeightedStrategy(),
-		CooldownTicks: randomIntRange(config.AiTraderCooldownMin, config.AiTraderCooldownMax),
-		RiskTolerance: randomTolerance(),
-		CoolDownLeft:  0,
-		SpawnedAt:     time.Now(),
-	})
-}
+			CooldownTicks: cd,
+			RiskTolerance: rt,
+			CoolDownLeft:  0,
+			SpawnedAt:     time.Now(),
+		})
+	}
 
 	return traders
 }

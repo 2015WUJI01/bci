@@ -18,7 +18,6 @@ import (
 type Scheduler struct {
 	traders    []*AiTrader
 	mu         sync.Mutex
-	sentiment  *MarketSentiment
 	metrics    *BotMetrics
 	tickCount  int64
 	PlaceOrder func(order *domain.Order) error
@@ -26,9 +25,8 @@ type Scheduler struct {
 
 func NewScheduler(traders []*AiTrader) *Scheduler {
 	return &Scheduler{
-		traders:   traders,
-		sentiment: NewMarketSentiment(),
-		metrics:   &BotMetrics{},
+		traders: traders,
+		metrics: &BotMetrics{},
 	}
 }
 
@@ -73,27 +71,6 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 
 	quarterlies, _ := store.GetQuarterliesByCompanyIDs(companyIDs, 8)
 
-	priceHistAll, _ := store.GetRecentClosePricesAll(20)
-	volHistAll, _ := store.GetRecentVolumesAll(20)
-
-	globalAvgVolume := int64(0)
-	totalStocks := 0
-	for _, vols := range volHistAll {
-		sum := int64(0)
-		count := 0
-		for _, v := range vols {
-			sum += v
-			count++
-		}
-		if count > 0 {
-			globalAvgVolume += sum / int64(count)
-			totalStocks++
-		}
-	}
-	if totalStocks > 0 {
-		globalAvgVolume /= int64(totalStocks)
-	}
-
 	stockByID := make(map[uint]*domain.Stock, len(stocks))
 	activeStocks := make([]*domain.Stock, 0, len(stocks))
 	for i := range stocks {
@@ -107,7 +84,6 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 		return
 	}
 
-	var allSignals []float64
 	depleted := 0
 	for _, trader := range ready {
 		openOrders, _ := store.GetOpenOrdersByPlayer(trader.ID)
@@ -132,6 +108,11 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 					engine.CancelOrder(db, o.ID, trader.ID)
 				}
 			}
+		}
+
+		if rand.Float64() < config.AiTraderSkipProbability {
+			trader.CoolDownLeft = trader.CooldownTicks
+			continue
 		}
 
 		sampled := sampleStocks(activeStocks)
@@ -184,75 +165,21 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 			}
 			prospMu.Unlock()
 
-			prices := priceHistAll[stock.ID]
-			volumes := volHistAll[stock.ID]
-
-			ma5 := int64(0)
-			if len(prices) >= 5 {
-				sum := int64(0)
-				for i := 0; i < 5; i++ {
-					sum += prices[i]
-				}
-				ma5 = sum / 5
-			}
-			ma20 := int64(0)
-			if len(prices) >= 20 {
-				sum := int64(0)
-				for i := 0; i < 20; i++ {
-					sum += prices[i]
-				}
-				ma20 = sum / 20
-			}
-
-			avgVol := int64(0)
-			if len(volumes) > 0 {
-				sum := int64(0)
-				for _, v := range volumes {
-					sum += v
-				}
-				avgVol = sum / int64(len(volumes))
-			}
-
 			stockQuarterlies := quarterlies[company.ID]
 
-			ctx := &FactorContext{
-				Stock:         stock,
-				Company:       company,
-				Quarters:      stockQuarterlies,
-				IndustryPE:    indCfg.PE,
-				Prosperity:    prosperity,
-				RecentPrices:  prices,
-				MA5:           ma5,
-				MA20:          ma20,
-				AvgVolume:     avgVol,
-				GlobalAvgVol:  globalAvgVolume,
-				Holding:       holdingMap[stock.ID],
-				PlayerState:   ps,
-				CapAssetValue: indCfg.CapAssetValue,
-			}
+			expectedPrice := float64(expectedPriceCents(company, stockQuarterlies, &indCfg, prosperity))
+			ratio := float64(stock.CurrentPrice) / expectedPrice
+			buyProb := buyProbability(ratio)
 
-			rawSignal := ComputeRawSignal(ctx, trader.Strategy)
-			allSignals = append(allSignals, rawSignal)
 			s.metrics.RecordSignal()
 
-			finalSignal := (1-config.AiTraderSentConduction)*rawSignal + config.AiTraderSentConduction*s.sentiment.Get()
-			finalSignal += (rand.Float64()*2 - 1) * config.AiTraderSignalJitter
-
-			if rand.Float64() < config.AiTraderRandomSideRate {
-				dir := 1.0
-				if rand.Float64() < 0.5 {
-					dir = -1.0
-				}
-				finalSignal = dir * randomFloatRange(config.AiTraderSignalThreshold+0.01, 0.5)
+			var order *domain.Order
+			if rand.Float64() < buyProb {
+				order = buildBuyOrderV2(trader, stock, ps, expectedPrice)
+			} else {
+				order = buildSellOrderV2(trader, stock, expectedPrice)
 			}
 
-			finalSignal = math.Max(-1, math.Min(1, finalSignal))
-
-			if math.Abs(finalSignal) <= config.AiTraderSignalThreshold {
-				continue
-			}
-
-			order := computeOrder(trader, stock, finalSignal)
 			if order == nil {
 				continue
 			}
@@ -278,8 +205,6 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 			depleted++
 		}
 	}
-
-	s.sentiment.Update(allSignals)
 
 	s.metrics.SetTraders(len(s.traders), depleted)
 

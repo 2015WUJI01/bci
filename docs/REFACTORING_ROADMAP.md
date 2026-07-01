@@ -666,54 +666,38 @@ internal/handler/
 
 ---
 
-## P4: AI 交易者系统 (4-5 天) ⏳ 设计完成
+## P4: AI 交易者系统 (4-5 天) ⏳ 已重构为 v2 烟蒂简化版
 
-> **目标**: 100 个 AI 交易者，统一因子评分模板，替代旧版 6 类独立实现。
+> **目标**: 100 个 AI 交易者，烟蒂估值 + 滑动概率模型，替代 v1 的 12 因子 × 7 策略复杂设计。
 >
-> **设计文档**: `docs/AI_TRADER_DESIGN.md`
+> **设计文档**: `docs/AI_TRADER_DESIGN.md`（已重写为 v2 版本）
 >
-> **策略变更**: 不保留旧版 6 类 Bot 各自实现。所有 AI 使用同一模板，差异仅在于 7 种策略权重向量不同。
+> **策略变更（2026-07-01）**: 放弃 12 因子 + 7 策略 + 市场情绪指数。改为统一烟蒂估值模型：`expectedPrice = max(liquidationValue, earningValue)`，买卖概率随 price/expected 比值线性滑动。
 
-### 设计参考
+### v2 设计要点
 
-| 文件 | 用途 |
-|------|------|
-| `docs/AI_TRADER_DESIGN.md` | 完整设计（权重矩阵、因子公式、生命周期、情绪指数） |
-| `backend/game_engine.py` → `_compute_signal` / NPC / retail / quant loops | 旧版行为参考（已废弃） |
+- **烟蒂估值**：max(清算价值, 盈利估值) × 景气度，自动适配盈利/亏损公司
+- **滑动概率**：ratio ≤ 0.5 → 买90%卖10%，ratio=1.0 → 各50%，ratio ≥ 2.0 → 买10%卖90%
+- **50% tick 跳过**：任意 tick 有 50% 概率什么都不做
+- **报价不对称**：price < expected → [0.9p, 1.2p]，price ≥ expected → [0.8p, 1.1p]
+- **个体扰动**：每 AI 预期股价 ±15% 随机偏差，形成自然对手盘
+- **冷却缩短**：2-8 tick（原 5-30）
+- **全部限价单**：不再区分市价/限价
+- **保留项**：止损闸门、生命周期、撤单策略
 
 ### 目录结构
 
 ```
-internal/engine/bots/
-├── ai_trader.go     # AiTrader struct + Strategy 权重预设 + 初始化
-├── factors.go       # 12 因子计算（6 理性 + 5 行为 + 1 噪声）
-├── scheduler.go     # ScheduleTick: 分层耗时日志 + 情绪指数更新
-├── lifecycle.go     # 零持仓初始化 + 枯竭退出 + 新生补充
-├── sentiment.go     # 市场情绪指数计算 + EMA 平滑
-└── metrics.go       # BotMetrics 实时计数器 + TraderStats
+internal/bots/
+├── ai_trader.go     # AiTrader struct（无 Strategy）+ 初始化
+├── scheduler.go     # ScheduleTick: 新决策流
+├── helpers.go       # 烟蒂估值 + 滑动概率 + 报价范围 + 订单构建
+├── lifecycle.go     # 初始化 + 枯竭重置 + 补给
+├── stoploss.go      # 止损闸门 (不变)
+└── metrics.go       # BotMetrics + TraderStats（无 Strategy 字段）
 ```
 
-### 设计要点
-
-- **统一因子模型**：12 因子 × 策略权重 → 综合信号（不区分类别，无 goroutine 每 Bot）
-- **每 tick 同步调度**：到期 AI → 采 20% 股票 → 算信号 → 限价下单，带分层耗时日志
-- **基本面锚定**：市场加权平均理性权重 53%，非理性行为产生波动但不脱锚
-- **市场情绪指数**：Information Cascade 模型，15% 跨 AI 情绪传导
-- **自循环生命周期**：零持仓起步，资金耗尽退出，每 100tick 补充至 100 人
-- **庄家已移除**：4 阶段操纵留给玩家手动执行
-- **复用现有基础设施**：PlayerState + Holding 表，ExecuteOrder + 订单簿撮合
-
-### AI 策略分布（100 个）
-
-| 策略 | 数量 | 理性权重 | 风格 |
-|------|:---:|:---:|------|
-| value | 20 | 75% | 低估+基本面 |
-| growth | 17 | 80% | 增长驱动 |
-| momentum | 14 | 0% | 追涨杀跌 |
-| contrarian | 12 | 25% | 逆向操作 |
-| balanced | 23 | 50% | 多因子均衡 |
-| national | 3 | 55% | 托市+价值 |
-| noise | 11 | 30% | 纯随机 |
+已删除：`factors.go`, `sentiment.go`
 
 ---
 
