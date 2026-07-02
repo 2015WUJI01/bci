@@ -35,6 +35,7 @@ func New(authH *handler.AuthHandler, playerH *handler.PlayerHandler, companyH *h
 		r.With(middleware.JWT).Get("/company/ipo/status", companyH.IpoStatus)
 		r.With(middleware.JWT).Get("/company/state", companyH.State)
 		r.With(middleware.JWT).Get("/company/quarterly", companyH.Quarterly)
+		r.With(middleware.JWT).Post("/company/liquidate", companyH.Liquidate)
 
 		r.Get("/market/stocks", marketH.ListStocks)
 		r.Get("/market/stock/{symbol}", marketH.GetStockDetail)

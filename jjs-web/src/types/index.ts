@@ -195,6 +195,7 @@ export interface CompanyState {
   pending_orders: PendingOrderInfo[]
   actions_submitted: number
   stock_price: number
+  can_liquidate: boolean
 }
 
 export type Industry = 'tech' | 'finance' | 'manufacturing' | 'mining' | 'consumer' | 'healthcare'
@@ -251,7 +252,7 @@ export interface RandomEvent {
 }
 
 export interface ActionItem {
-  type: 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing'
+  type: 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing' | 'inject_capital'
   amount: number
 }
 
@@ -268,6 +269,19 @@ export interface ActionResponse {
   employees: number
   cap_count: number
   actions: ActionLog[]
+}
+
+export interface LiquidationResult {
+  fire_sale: number
+  per_share: number
+  distributed: number
+  holders: number
+}
+
+export interface LiquidateResponse {
+  status: string
+  message: string
+  result: LiquidationResult
 }
 
 export interface MarginAccount {

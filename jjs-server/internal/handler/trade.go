@@ -58,17 +58,30 @@ func (h *TradeHandler) PlaceOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var stockID uint
+	var stock *domain.Stock
 	if req.StockID > 0 {
 		stockID = req.StockID
-	} else if req.Symbol != "" {
-		stock, err := store.GetStockBySymbol(req.Symbol)
+		s, err := store.GetStockByID(stockID)
 		if err != nil {
 			WriteJSON(w, http.StatusNotFound, map[string]string{"error": "股票不存在"})
 			return
 		}
+		stock = s
+	} else if req.Symbol != "" {
+		s, err := store.GetStockBySymbol(req.Symbol)
+		if err != nil {
+			WriteJSON(w, http.StatusNotFound, map[string]string{"error": "股票不存在"})
+			return
+		}
+		stock = s
 		stockID = stock.ID
 	} else {
 		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "缺少股票信息"})
+		return
+	}
+
+	if stock.Status != "active" {
+		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "股票已退市"})
 		return
 	}
 

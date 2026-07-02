@@ -4,7 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { api } from '@/api/client'
 import { useCompanyState, usePlayerInfo, useIpoStatus } from '@/api/queries'
 import { Panel } from '@/components/Panel'
-import type { ActionResponse } from '@/types'
+import type { ActionResponse, LiquidationResult } from '@/types'
 
 const INDUSTRY_META: Record<string, { name: string; icon: string; desc: string; enabled: boolean }> = {
   tech:          { name: '科技',     icon: '💻', desc: '技术驱动，重研发投入，设备迭代快', enabled: false },
@@ -83,7 +83,7 @@ export function CompanyPage() {
   const [error, setError] = useState('')
   const [showGuide, setShowGuide] = useState(false)
   const [showActions, setShowActions] = useState(false)
-  const [actionView, setActionView] = useState<'selection' | 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing'>('selection')
+  const [actionView, setActionView] = useState<'selection' | 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing' | 'inject_capital'>('selection')
   const [actionAmount, setActionAmount] = useState(0)
   const [actionsSubmitted, setActionsSubmitted] = useState(0)
   useEffect(() => {
@@ -101,6 +101,8 @@ export function CompanyPage() {
   }, [playerInfo, investInitialized])
   const [submittingActions, setSubmittingActions] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [liquidating, setLiquidating] = useState(false)
+  const [liquidationResult, setLiquidationResult] = useState<LiquidationResult | null>(null)
   const queryClient = useQueryClient()
 
   const playerCash = playerInfo?.cash ?? 100000
@@ -150,7 +152,7 @@ export function CompanyPage() {
     }
   }
 
-  const handleSubmitAction = async (type: 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing', amount: number) => {
+  const handleSubmitAction = async (type: 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing' | 'inject_capital', amount: number) => {
     if (!company) return
     setSubmittingActions(true)
     setActionError('')
@@ -165,6 +167,24 @@ export function CompanyPage() {
       setActionError(err instanceof Error ? err.message : '操作失败')
     } finally {
       setSubmittingActions(false)
+    }
+  }
+
+  const handleLiquidate = async () => {
+    if (!company) return
+    setLiquidating(true)
+    setError('')
+    try {
+      const result = await api.post<{ status: string; message: string; result: LiquidationResult }>('/company/liquidate')
+      setLiquidationResult(result.result)
+      queryClient.invalidateQueries({ queryKey: ['company'] })
+      queryClient.invalidateQueries({ queryKey: ['stocks'] })
+      queryClient.invalidateQueries({ queryKey: ['portfolio'] })
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '清算失败')
+    } finally {
+      setLiquidating(false)
     }
   }
 
@@ -328,6 +348,42 @@ function DetailItem({ label, value, positive, hint }: {
           </Panel>
         </div>
       ) : (() => {
+        if (company.status === 'liquidated') {
+          return (
+            <div className="space-y-3">
+              <Panel title="公司已破产清算">
+                <div className="p-4 text-center">
+                  <div className="text-4xl mb-3">🏚</div>
+                  <div className="text-lg font-bold text-text-muted mb-2">{company.name}</div>
+                  <div className="text-sm text-text-muted">
+                    公司已经破产清算，所有资产已处置完毕。
+                  </div>
+                  {liquidationResult && liquidationResult.holders > 0 && (
+                    <div className="mt-3 text-sm text-text-secondary">
+                      <div>资产处置: ¥{liquidationResult.fire_sale.toLocaleString()}</div>
+                      {liquidationResult.per_share > 0 && (
+                        <div>每股分配: ¥{liquidationResult.per_share.toLocaleString()} · {liquidationResult.holders} 位持有者</div>
+                      )}
+                      {liquidationResult.distributed > 0 && (
+                        <div>已分配: ¥{liquidationResult.distributed.toLocaleString()}</div>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      queryClient.invalidateQueries({ queryKey: ['company'] })
+                      setLiquidationResult(null)
+                    }}
+                    className="btn btn-primary mt-4"
+                  >
+                    创建新公司
+                  </button>
+                </div>
+              </Panel>
+            </div>
+          )
+        }
+
           const confirmedQ = company.last_quarterly
           const invDelta = confirmedQ ? confirmedQ.prod_qty - confirmedQ.sales_qty : 0
           const isMfg = company.industry === 'manufacturing'
@@ -350,6 +406,7 @@ function DetailItem({ label, value, positive, hint }: {
             layoff: { title: '裁员', inputLabel: '裁员人数', unit: '人' },
             sell_assets: { title: '资产处置', inputLabel: ind.sellLabel, unit: ind.sellUnit },
             marketing: { title: '营销推广', inputLabel: '投入金额', unit: '¥' },
+            inject_capital: { title: '个人注资', inputLabel: '注资金额', unit: '¥' },
           }
 
           let maxAmount: number
@@ -368,6 +425,9 @@ function DetailItem({ label, value, positive, hint }: {
             maxAmount = company.cap_count
             cost = 0
             income = actionAmount * assetSellPrice
+          } else if (actionView === 'inject_capital') {
+            maxAmount = playerInfo?.cash ?? 0
+            cost = 0
           } else {
             maxAmount = Math.floor(company.cash)
             cost = actionAmount
@@ -375,8 +435,8 @@ function DetailItem({ label, value, positive, hint }: {
 
           const remaining = 3 - actionsSubmitted
           const canSubmit =
-            actionView === 'sell_assets' || actionView === 'layoff'
-              ? actionAmount > 0 && remaining > 0
+            actionView === 'sell_assets' || actionView === 'layoff' || actionView === 'inject_capital'
+              ? actionAmount > 0 && remaining > 0 && (actionView !== 'inject_capital' || actionAmount <= (playerInfo?.cash ?? 0))
               : actionAmount > 0 && cost <= company.cash && remaining > 0
 
           return (
@@ -438,7 +498,25 @@ function DetailItem({ label, value, positive, hint }: {
                   hint={confirmedQ ? `上季产量 ${confirmedQ.prod_qty.toLocaleString()} - 销量 ${confirmedQ.sales_qty.toLocaleString()} = 库存${invDelta >= 0 ? '+' : ''}${invDelta.toLocaleString()}` : undefined}
                 />
               </div>
-              <div className="mt-3 pt-3 border-t border-border">
+          {company.can_liquidate && (
+            <div className="bg-accent-red/10 border border-accent-red rounded-lg p-4 space-y-2">
+              <div className="text-sm font-bold text-accent-red">破产清算</div>
+              <div className="text-xs text-text-secondary">
+                公司已连续两季度现金为负，达到破产清算条件。清算将出售全部库存与资产、解散员工，并按持股分配剩余现金。
+              </div>
+              <button
+                className="btn btn-danger btn-full"
+                disabled={liquidating}
+                onClick={handleLiquidate}
+              >
+                {liquidating ? '清算中...' : '确认破产清算'}
+              </button>
+            </div>
+          )}
+
+          {error && <p className="text-accent-red text-sm text-center">{error}</p>}
+
+          <div className="mt-3 pt-3 border-t border-border">
                 <button
                   className="btn btn-primary btn-full"
                   onClick={() => { setShowActions(true); setActionView('selection'); setActionAmount(0); setActionError('') }}
@@ -738,6 +816,19 @@ function DetailItem({ label, value, positive, hint }: {
                         </div>
                       </button>
 
+                      <button
+                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-gold hover:bg-accent-gold/5 transition-colors"
+                        onClick={() => { setActionView('inject_capital'); setActionAmount(0); setActionError('') }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">💰</span>
+                          <span className="text-sm font-semibold text-text-primary">个人注资</span>
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          从个人现金转入公司 · 不改变股权
+                        </div>
+                      </button>
+
                       {actionsSubmitted >= 3 && (
                         <p className="text-xs text-text-muted text-center">本季度操作次数已用完</p>
                       )}
@@ -825,6 +916,8 @@ function DetailItem({ label, value, positive, hint }: {
                             </div>
                           ) : actionView === 'sell_assets' ? (
                             <span>{isMfg ? `¥${Math.round(80000 * 0.75).toLocaleString()}/条 · 当前 ${company.cap_count} 条` : `¥${(2.0 * 0.75).toFixed(1)}/单位 · 当前 ${company.cap_count.toLocaleString()} 单位`}</span>
+                          ) : actionView === 'inject_capital' ? (
+                            <span>注资后公司现金 ¥{company.cash.toLocaleString()} → ¥{(company.cash + actionAmount).toLocaleString()}</span>
                           ) : actionAmount > 0 ? (
                             <span>预计提升 {Math.round(actionAmount * marketingMinPerYuan).toLocaleString()}~{Math.round(actionAmount * marketingMaxPerYuan).toLocaleString()} {isMfg ? '件' : '单位'} 需求</span>
                           ) : (
@@ -836,6 +929,8 @@ function DetailItem({ label, value, positive, hint }: {
                       <div className="text-xs text-text-muted text-center">
                         {actionView === 'sell_assets' ? (
                           <>出售收入 <span className="font-semibold text-up">¥{income.toLocaleString()}</span></>
+                        ) : actionView === 'inject_capital' ? (
+                          <>从个人账户转入 <span className={`font-semibold ${actionAmount > (playerInfo?.cash ?? 0) ? 'text-down' : 'text-accent-gold'}`}>¥{actionAmount.toLocaleString()}</span></>
                         ) : (
                           <>成本 <span className={`font-semibold ${cost > company.cash ? 'text-down' : 'text-text-primary'}`}>¥{cost.toLocaleString()}</span></>
                         )}
@@ -850,12 +945,14 @@ function DetailItem({ label, value, positive, hint }: {
                       >
                         {actionAmount === 0
                           ? '请选择数量'
-                          : actionView === 'sell_assets' || actionView === 'layoff'
+                          : actionView === 'sell_assets' || actionView === 'layoff' || actionView === 'inject_capital'
                           ? remaining <= 0
                             ? '操作次数已用完'
+                            : actionView === 'inject_capital' && actionAmount > (playerInfo?.cash ?? 0)
+                            ? '个人现金不足'
                             : submittingActions
                             ? '提交中...'
-                            : actionView === 'sell_assets' ? '确认出售' : '确认裁员'
+                            : actionView === 'sell_assets' ? '确认出售' : actionView === 'inject_capital' ? '确认注资' : '确认裁员'
                           : cost > company.cash
                           ? '公司现金不足'
                           : remaining <= 0

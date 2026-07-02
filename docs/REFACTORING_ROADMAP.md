@@ -219,7 +219,7 @@ type Company struct {
     Employees int       // 员工数（驱动力）
     Quarter   int       // 当前季度
     LastSettledQuarter int // 最近已完成最终结算的季度（用于恢复和去重）
-    Status    string    // active | bankrupt
+    Status    string    // active | liquidated
     TotalShares int     // 总股本
     CEOShares   int64   // CEO持股数
     CapCount    int     // 产线数量
@@ -397,6 +397,10 @@ internal/engine/
 - ✅ 扩产/招人行动系统（每季 3 次硬限制，建造队列 季度初处理 + 季度末安全网；banking/tech 即时生效）（2026-06-23）
 - ✅ 裁员 + 资产处置行动系统，招募改革为岗位制（30%~100%）（2026-06-24）
 - ✅ `IndustryConfig` 新增 `LaborRate` 字段，移除 `CapSpecial`（2026-06-24）
+- ✅ 个人注资行动（`inject_capital`，从玩家现金注入公司，不改变股权，占 1 次/季）
+- ✅ 破产清算机制（连续两季度财报现金 < 0 → 按钮触发 → 撤单/裁员/资产折价50%/按持股分配/退市/清零持仓/清 BrokerInventory）
+- ✅ 退市机制（`Stock.Status = "delisted"`，行情/交易/列表自动过滤，挂单全部取消）
+- ✅ 公司创建校验：`Status` 为 `"liquidated"` 的旧公司不阻塞创建新公司
 - ⏳ 董事会/KPI 系统（另行设计）
 - ⏳ 研发系统
 - ⏳ 随机事件
@@ -1001,6 +1005,7 @@ internal/handler/
 ✅ P3.6 完成 (2026-06-24): WebSocket Hub/Client + price_update广播 + portfolio_update单播
 ✅ P3.6+ 完成 (2026-06-29): orderbook/trade_tape WS推送 + price_update增强(K线OHLC) + 前端实时数据消费（五档盘口/K线合并/资金WS优先）+ broker回调bug修复
 ✅ P3.7 完成 (2026-06-24): MarketPage + PortfolioPage + TradeForm + KlineChart（三模式双面板）
+✅ P2.3 完成 (2026-07-02): 个人注资行动 + 破产清算机制 + 退市机制 + 挂单/持仓清理
 Week 5:      P4 AI 交易者（6 类 Bot）
 Week 5-6:    P5 业务系统（融资、SEC、市场新闻、排行榜）
 Week 6:      补完 P6 管理端点 / P7 Leaderboard + 通知面板

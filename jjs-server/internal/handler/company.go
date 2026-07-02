@@ -67,6 +67,7 @@ type companyStateResponse struct {
 	PendingOrders    []PendingOrderInfo       `json:"pending_orders"`
 	ActionsSubmitted int                      `json:"actions_submitted"`
 	StockPrice       int64                    `json:"stock_price"`
+	CanLiquidate     bool                     `json:"can_liquidate"`
 }
 
 var industryPrefix = map[string]string{
@@ -388,7 +389,7 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	company, err := store.GetActiveCompanyByCEOID(userID)
+	company, err := store.GetCompanyByCEOID(userID)
 	if err != nil {
 		WriteJSON(w, http.StatusOK, map[string]any{"has_company": false})
 		return
@@ -487,5 +488,6 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		PendingOrders:    pendingList,
 		ActionsSubmitted: actionsSubmitted,
 		StockPrice:       stockPrice,
+		CanLiquidate:     engine.CanLiquidate(company.ID, currentQ),
 	})
 }

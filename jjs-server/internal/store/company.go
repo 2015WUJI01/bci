@@ -1,6 +1,8 @@
 package store
 
 import (
+	"gorm.io/gorm"
+
 	"jjs-server/internal/domain"
 )
 
@@ -25,6 +27,15 @@ func CreateCompany(c *domain.Company) error {
 func GetActiveCompanyByCEOID(ceoID string) (*domain.Company, error) {
 	var c domain.Company
 	err := DB.Where("ceo_id = ? AND status = ?", ceoID, "active").First(&c).Error
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func GetCompanyByCEOID(ceoID string) (*domain.Company, error) {
+	var c domain.Company
+	err := DB.Where("ceo_id = ?", ceoID).Order("id DESC").First(&c).Error
 	if err != nil {
 		return nil, err
 	}
@@ -128,4 +139,8 @@ func GetQuarterliesByCompanyIDs(ids []uint, limit int) (map[uint][]domain.Compan
 		result[q.CompanyID] = append(result[q.CompanyID], q)
 	}
 	return result, nil
+}
+
+func DeleteBuildOrdersByCompanyID(tx *gorm.DB, companyID uint) error {
+	return tx.Where("company_id = ?", companyID).Delete(&domain.CapBuildOrder{}).Error
 }

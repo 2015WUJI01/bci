@@ -32,11 +32,12 @@ type actionResponse struct {
 }
 
 var validActionTypes = map[string]bool{
-	"expand":      true,
-	"hire":        true,
-	"layoff":      true,
-	"sell_assets": true,
-	"marketing":   true,
+	"expand":         true,
+	"hire":           true,
+	"layoff":         true,
+	"sell_assets":    true,
+	"marketing":      true,
+	"inject_capital": true,
 }
 
 const assetSellDiscount = 0.75
@@ -231,6 +232,20 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 				Cost:   int64(a.Amount),
 			})
 			slog.Info("marketing completed", "company", c.ID, "investment", a.Amount, "demandBoost", demandBoost)
+
+		case "inject_capital":
+			cashAmount := int64(a.Amount)
+			if err := store.DeductCash(userID, cashAmount, "公司注资"); err != nil {
+				WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "个人现金不足"})
+				return
+			}
+			c.Cash += cashAmount
+			actionLogs = append(actionLogs, domain.ActionLog{
+				Type:   "inject_capital",
+				Amount: a.Amount,
+				Cost:   int64(-cashAmount),
+			})
+			slog.Info("capital injected", "company", c.ID, "amount", cashAmount)
 		}
 	}
 

@@ -14,7 +14,7 @@ func GetStocksByIDs(ids []uint) ([]domain.Stock, error) {
 
 func ListStocks() ([]domain.Stock, error) {
 	var stocks []domain.Stock
-	err := DB.Find(&stocks).Error
+	err := DB.Where("status = ?", "active").Find(&stocks).Error
 	return stocks, err
 }
 

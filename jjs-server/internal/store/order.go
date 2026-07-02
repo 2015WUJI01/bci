@@ -61,6 +61,13 @@ func GetOpenOrdersByPlayer(playerID string) ([]domain.Order, error) {
 	return orders, err
 }
 
+func GetAllOpenOrdersByStock(stockID uint) ([]domain.Order, error) {
+	var orders []domain.Order
+	err := DB.Where("stock_id = ? AND status IN ('open','partial')", stockID).
+		Find(&orders).Error
+	return orders, err
+}
+
 func GetBestOpenBuyOrder(stockID uint) (*domain.Order, error) {
 	var order domain.Order
 	err := DB.Where("stock_id = ? AND side = 'buy' AND status IN ('open','partial')", stockID).

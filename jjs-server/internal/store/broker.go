@@ -24,3 +24,7 @@ func DeductBrokerInventory(tx *gorm.DB, stockID uint, qty int64) error {
 	return tx.Model(&domain.BrokerInventory{}).Where("stock_id = ? AND total_qty >= ?", stockID, qty).
 		Update("total_qty", gorm.Expr("total_qty - ?", qty)).Error
 }
+
+func DeleteBrokerInventoryByStockID(tx *gorm.DB, stockID uint) error {
+	return tx.Where("stock_id = ?", stockID).Delete(&domain.BrokerInventory{}).Error
+}

@@ -83,3 +83,17 @@ func DeductHoldingQtyByPlayerStock(db *gorm.DB, playerID string, stockID uint, q
 			"frozen_qty": gorm.Expr("frozen_qty - ?", qty),
 		}).Error
 }
+
+func GetHoldingsByStockID(stockID uint) ([]domain.Holding, error) {
+	var holdings []domain.Holding
+	err := DB.Where("stock_id = ? AND qty > 0", stockID).Find(&holdings).Error
+	return holdings, err
+}
+
+func ZeroOutHoldings(tx *gorm.DB, stockID uint) error {
+	return tx.Model(&domain.Holding{}).Where("stock_id = ?", stockID).
+		Updates(map[string]interface{}{
+			"qty":        0,
+			"frozen_qty": 0,
+		}).Error
+}
