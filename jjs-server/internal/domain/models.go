@@ -115,6 +115,7 @@ type Stock struct {
 	Symbol       string    `gorm:"type:varchar(10);uniqueIndex;not null"`
 	CurrentPrice int64     `gorm:"not null;default:0"`
 	PrevClose    int64     `gorm:"not null;default:0"`
+	Status       string    `gorm:"type:varchar(20);not null;default:'active'"`
 	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
 }
 

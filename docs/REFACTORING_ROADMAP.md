@@ -531,6 +531,7 @@ internal/handler/
 - 手续费: 买方佣金 0.025%（min ¥5），卖方佣金+印花税 0.1%
 - 撮合: 价格优先→同价时间优先(SeqNum)，限价单受阻价，市价单扫全部
 - 系统账号: `PlayerID="BROKER"` 接收 Broker 卖出资金。Broker 扫描时对比 `max(最优买价, 现价) × 0.9`，仅当买单价 ≥ 参考价 90% 时释放库存，防止价格背离时低价出货（2026-07-02 重构：移除超时概念，每 tick 取最优买单，`SELECT FOR UPDATE` 加锁防并发竞态）
+- **冻结资金一致性 (2026-07-02)**: 提取 `CancelOrderTx(tx)` 公开函数，Bot 生命周期重置路径（`ResetTrader`/`RestoreTraders`/`InitTraders`）改为事务内先取消所有挂单再清零 `frozen_cash`，修复 `frozen_cash=0` 但订单 `FrozenAmount>0` 的不一致 bug。`executeSell` 填满买单后补齐 `opp.FrozenAmount=0` 持久化。详见 `ARCHITECTURE.md` 冻结资金一致性节。
 
 **产出**: 引擎+Store+最小API全部可用，无做空。
 

@@ -413,6 +413,25 @@ frontend/src/
    - 更新已有季报时必须保留 `CreatedAt = existing.CreatedAt`
 3. **避免 raw SQL 与 GORM 混用** — `tx.Exec` 的参数绑定可能与 GORM 事务行为不一致，统一用 `tx.Model().Updates()` 更可靠
 
+### 冻结资金一致性 (frozen_cash ⇔ frozen_amount)
+
+**不变量**：`play_state.frozen_cash` 必须恒等于该玩家所有 `open`/`partial` 买入订单的 `frozen_amount` 之和。
+
+**实现机制**：所有对两者的修改在同一 DB 事务 (`tx`) 中成对执行，不依赖任何事后的校验或修复脚本。
+
+| 操作 | `frozen_cash` 变更 | `order.frozen_amount` 变更 | 事务函数 |
+|------|--------------------|--------------------------|---------|
+| 买单调入 | `FreezeCash` +estimated | `= estimatedCost` | `executeBuy` |
+| 买入成交 | `DeductFrozenCash` -cost | `-= cost` | `executeBuy` / `executeSell` / `ReleaseBrokerInventory` |
+| 买单填满（剩余） | `UnfreezeCash` -remainder | `= 0` | `executeBuy` / `executeSell` |
+| 买单撤单 | `UnfreezeCash` -全部 | `= 0` | `CancelOrderTx` |
+
+**关键 API**：`CancelOrderTx(tx, orderID, playerID)` 是 `engine` 包的公开函数，允许调用方在已有事务中撤销订单，避免 Bot 生命周期重置路径绕过订单取消直接清零 `frozen_cash`。
+
+**已知陷阱**：
+- `ResetTrader` / `RestoreTraders` / `InitTraders` 必须在重置 `frozen_cash = 0` 之前通过 `CancelOrderTx` 取消所有挂单，否则会破坏不变量
+- `executeSell` 填满对手买单后必须同时 `opp.FrozenAmount = 0` + 持久化，参见 `matching.go:427-432`
+
 ---
 
 ## 新系统 WS 消息规范 (Go + React, 2026-06-29)
