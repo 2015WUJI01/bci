@@ -316,7 +316,7 @@ Profit           = Revenue - TotalCost
 - 每次「招募」= 1 个操作位 + 滑动条选择 N 个岗位 → `Employees += round(N × random(0.3~1.0))`（岗位制：上限=岗位数，下限30%）
 - 每次「裁员」= 1 个操作位 + 滑动条选择 N 人 → `Employees -= N`，成本 = `N × LaborRate × 3`（3倍季度工资补偿），可裁至0人
 - 每次「资产处置」= 1 个操作位 + 滑动条选择 N → `CapCount -= N`，获得现金 = `N × CapAssetValue × 0.75`（折价75%），制造业出售产线、矿业出售矿权
-- 每次「营销」= 1 个操作位 + 滑动条投入金额 → `Company.Cash -= 投入`，`Company.Demand += round(投入 × random(MarketingDemandMin, MarketingDemandMax))`。制造业每1¥ = 0.075~0.175需求，矿业每1¥ = 0.125~0.292需求，当场生效（结算时受产能封顶截断）
+- 每次「营销」= 1 个操作位 + 滑动条投入金额 → `Company.Cash -= 投入`，`demandBoost = round(Scale × amount^Exponent × rand(0.85, 1.15))`。制造业 Scale=5.0 Exponent=0.6，矿业 Scale=8.0 Exponent=0.6，投入越大边际效率越低，当场生效（结算时受产能封顶截断）✅ 2026-07-02 幂函数改造
 - 资本类动作（分红/回购）暂无实现
 
 **建造队列结算**（`engine/ticker.go:processBuildQueue` + `processAllBuildQueues`）:

@@ -18,9 +18,9 @@ type IndustryConfig struct {
 	HireCost             float64
 	LaborRate            float64
 
-	// 营销: 每¥1投入的需求增量范围
-	MarketingDemandMin float64
-	MarketingDemandMax float64
+	// 营销: Scale × amount^Exponent × 随机因子(0.85~1.15)
+	MarketingScale    float64
+	MarketingExponent float64
 
 	// 景气度游走参数 (中心=1.0)
 	ProsperityMin        float64
@@ -69,8 +69,8 @@ var Industries = map[string]IndustryConfig{
 		OperationalCostRate:  1700,
 		HireCost:             5000,
 		LaborRate:            2000,
-		MarketingDemandMin:   0,
-		MarketingDemandMax:   0,
+		MarketingScale:    0,
+		MarketingExponent: 0,
 		ProsperityMin:        0.85,
 		ProsperityMax:        1.15,
 		ProsperityMaxStep:    0.05,
@@ -98,8 +98,8 @@ var Industries = map[string]IndustryConfig{
 		OperationalCostRate:  3000,
 		HireCost:             3000,
 		LaborRate:            3000,
-		MarketingDemandMin:   0,
-		MarketingDemandMax:   0,
+		MarketingScale:    0,
+		MarketingExponent: 0,
 		ProsperityMin:        0.90,
 		ProsperityMax:        1.10,
 		ProsperityMaxStep:    0.04,
@@ -127,8 +127,8 @@ var Industries = map[string]IndustryConfig{
 		OperationalCostRate:  2000,
 		HireCost:             3000,
 		LaborRate:            2500,
-		MarketingDemandMin:   0.075,
-		MarketingDemandMax:   0.175,
+		MarketingScale:    5.0,
+		MarketingExponent: 0.6,
 		ProsperityMin:        0.90,
 		ProsperityMax:        1.10,
 		ProsperityMaxStep:    0.04,
@@ -156,8 +156,8 @@ var Industries = map[string]IndustryConfig{
 		OperationalCostRate:  1200,
 		HireCost:             3000,
 		LaborRate:            2500,
-		MarketingDemandMin:   0.125,
-		MarketingDemandMax:   0.292,
+		MarketingScale:    8.0,
+		MarketingExponent: 0.6,
 		ProsperityMin:        0.85,
 		ProsperityMax:        1.15,
 		ProsperityMaxStep:    0.05,
@@ -185,8 +185,8 @@ var Industries = map[string]IndustryConfig{
 		OperationalCostRate:  1500,
 		HireCost:             3000,
 		LaborRate:            2500,
-		MarketingDemandMin:   0,
-		MarketingDemandMax:   0,
+		MarketingScale:    0,
+		MarketingExponent: 0,
 		ProsperityMin:        0.94,
 		ProsperityMax:        1.06,
 		ProsperityMaxStep:    0.03,
@@ -214,8 +214,8 @@ var Industries = map[string]IndustryConfig{
 		OperationalCostRate:  3000,
 		HireCost:             3000,
 		LaborRate:            3000,
-		MarketingDemandMin:   0,
-		MarketingDemandMax:   0,
+		MarketingScale:    0,
+		MarketingExponent: 0,
 		ProsperityMin:        0.94,
 		ProsperityMax:        1.06,
 		ProsperityMaxStep:    0.03,

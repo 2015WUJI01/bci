@@ -103,7 +103,7 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "出售数量超过现有资产"})
 			return
 		}
-		if a.Type == "marketing" && cfg.MarketingDemandMin <= 0 {
+		if a.Type == "marketing" && cfg.MarketingScale <= 0 {
 			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "该行业暂不支持营销"})
 			return
 		}
@@ -215,16 +215,16 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 			slog.Info("assets sold", "company", c.ID, "amount", a.Amount, "cashReceived", sellCash)
 
 		case "marketing":
-			var demandPerYuan float64
+			amount := float64(a.Amount)
+			var demandBoost float64
 			if c.Industry == "mining" {
 				rng := engine.MiningRNG(c.ID, currentQ, "marketing", 0)
-				demandPerYuan = cfg.MarketingDemandMin + rng.Float64()*(cfg.MarketingDemandMax-cfg.MarketingDemandMin)
+				demandBoost = cfg.MarketingScale * math.Pow(amount, cfg.MarketingExponent) * (0.85 + rng.Float64()*0.30)
 			} else {
 				rng := engine.ManufacturingRNG(c.ID, currentQ, "marketing")
-				demandPerYuan = cfg.MarketingDemandMin + rng.Float64()*(cfg.MarketingDemandMax-cfg.MarketingDemandMin)
+				demandBoost = cfg.MarketingScale * math.Pow(amount, cfg.MarketingExponent) * (0.85 + rng.Float64()*0.30)
 			}
-			demandBoost := int64(math.Round(float64(a.Amount) * demandPerYuan))
-			c.Demand += demandBoost
+			c.Demand += int64(math.Round(demandBoost))
 			actionLogs = append(actionLogs, domain.ActionLog{
 				Type:   "marketing",
 				Amount: a.Amount,

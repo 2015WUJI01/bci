@@ -390,8 +390,8 @@ function DetailItem({ label, value, positive, hint }: {
           const hireUnitCost = 3000
           const layoffUnitCost = 7500
           const assetSellPrice = isMfg ? 80000 * 0.75 : 2.0 * 0.75
-          const marketingMinPerYuan = isMfg ? 0.075 : 0.125
-          const marketingMaxPerYuan = isMfg ? 0.175 : 0.292
+          const marketingScale = isMfg ? 5.0 : 8.0
+          const marketingExponent = 0.6
           const perWorkerOutput = isMfg ? 2000 : 1500
           const outputUnit = isMfg ? '件' : '单位'
 
@@ -917,11 +917,19 @@ function DetailItem({ label, value, positive, hint }: {
                             <span>{isMfg ? `¥${Math.round(80000 * 0.75).toLocaleString()}/条 · 当前 ${company.cap_count} 条` : `¥${(2.0 * 0.75).toFixed(1)}/单位 · 当前 ${company.cap_count.toLocaleString()} 单位`}</span>
                           ) : actionView === 'inject_capital' ? (
                             <span>注资后公司现金 ¥{company.cash.toLocaleString()} → ¥{(company.cash + actionAmount).toLocaleString()}</span>
-                          ) : actionAmount > 0 ? (
-                            <span>预计提升 {Math.round(actionAmount * marketingMinPerYuan).toLocaleString()}~{Math.round(actionAmount * marketingMaxPerYuan).toLocaleString()} {isMfg ? '件' : '单位'} 需求</span>
-                          ) : (
-                            <span>{isMfg ? '每¥1投入 = 0.075~0.175 件需求增量' : '每¥1投入 = 0.125~0.292 单位需求增量'}</span>
-                          )}
+                          ) : actionAmount > 0 ? (() => {
+                              const base = marketingScale * Math.pow(actionAmount, marketingExponent)
+                              const minB = Math.round(base * 0.85)
+                              const maxB = Math.round(base * 1.15)
+                              const avgB = Math.round(base)
+                              const costPerUnit = actionAmount / avgB
+                              return (
+                                <span>预计提升 {minB.toLocaleString()}~{maxB.toLocaleString()} {isMfg ? '件' : '单位'} 需求 · ¥{costPerUnit.toFixed(1)}/{isMfg ? '件' : '单位'}</span>
+                              )
+                            })() : (
+                              <span>{isMfg ? '投入 ¥10,000 → 约 1,256 件需求（投入越大，效率越低）' : '投入 ¥10,000 → 约 2,009 单位需求（投入越大，效率越低）'}</span>
+                            )
+                          }
                         </div>
                       </div>
 
