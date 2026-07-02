@@ -398,7 +398,7 @@ internal/engine/
 - ✅ 裁员 + 资产处置行动系统，招募改革为岗位制（30%~100%）（2026-06-24）
 - ✅ `IndustryConfig` 新增 `LaborRate` 字段，移除 `CapSpecial`（2026-06-24）
 - ✅ 个人注资行动（`inject_capital`，从玩家现金注入公司，不改变股权，占 1 次/季）
-- ✅ 破产清算机制（连续两季度财报现金 < 0 → 按钮触发 → 撤单/裁员/资产折价50%/按持股分配/退市/清零持仓/清 BrokerInventory）
+- ✅ 破产清算机制（连续两季度财报现金 < 0 → 按钮触发 → 撤单/裁员/资产折价50%/按持股分配(IPO后按holdings表,IPO前CEO按CEOShares比例)/退市/清零持仓/清 BrokerInventory）
 - ✅ 退市机制（`Stock.Status = "delisted"`，行情/交易/列表自动过滤，挂单全部取消）
 - ✅ 公司创建校验：`Status` 为 `"liquidated"` 的旧公司不阻塞创建新公司
 - ⏳ 董事会/KPI 系统（另行设计）
@@ -1006,6 +1006,7 @@ internal/handler/
 ✅ P3.6+ 完成 (2026-06-29): orderbook/trade_tape WS推送 + price_update增强(K线OHLC) + 前端实时数据消费（五档盘口/K线合并/资金WS优先）+ broker回调bug修复
 ✅ P3.7 完成 (2026-06-24): MarketPage + PortfolioPage + TradeForm + KlineChart（三模式双面板）
 ✅ P2.3 完成 (2026-07-02): 个人注资行动 + 破产清算机制 + 退市机制 + 挂单/持仓清理
+✅ P2.3 fix (2026-07-02): 破产清算 Pre-IPO 路径修复——原逻辑仅 IPO 后分配现金，新增 Pre-IPO 分支：CEO 按 CEOShares/TotalShares 比例获得现金，投资人份额自然蒸发
 Week 5:      P4 AI 交易者（6 类 Bot）
 Week 5-6:    P5 业务系统（融资、SEC、市场新闻、排行榜）
 Week 6:      补完 P6 管理端点 / P7 Leaderboard + 通知面板

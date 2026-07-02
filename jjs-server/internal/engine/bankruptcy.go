@@ -135,6 +135,19 @@ func LiquidateCompany(db *gorm.DB, company *domain.Company) (*LiquidationResult,
 		result.Holders = len(holdings)
 	}
 
+	if stock == nil && company.Cash > 0 && company.TotalShares > 0 {
+		ceoCash := company.Cash * company.CEOShares / company.TotalShares
+		if ceoCash > 0 {
+			if err := store.AddCash(tx, company.CEOID, ceoCash); err != nil {
+				tx.Rollback()
+				return nil, err
+			}
+			result.PerShare = company.Cash / company.TotalShares
+			result.Distributed = ceoCash
+			result.Holders = 1
+		}
+	}
+
 	if stock != nil {
 		if err := store.ZeroOutHoldings(tx, stock.ID); err != nil {
 			tx.Rollback()
