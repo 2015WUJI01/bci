@@ -103,6 +103,7 @@ export function CompanyPage() {
   const [actionError, setActionError] = useState('')
   const [liquidating, setLiquidating] = useState(false)
   const [liquidationResult, setLiquidationResult] = useState<LiquidationResult | null>(null)
+  const [showCreateAfterLiquidation, setShowCreateAfterLiquidation] = useState(false)
   const queryClient = useQueryClient()
 
   const playerCash = playerInfo?.cash ?? 100000
@@ -130,6 +131,7 @@ export function CompanyPage() {
         investor_shares: investorShares,
         player_investment: playerInvestment,
       })
+      setShowCreateAfterLiquidation(false)
       queryClient.invalidateQueries({ queryKey: ['company'] })
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建失败')
@@ -229,7 +231,7 @@ function DetailItem({ label, value, positive, hint }: {
         </button>
       </div>
 
-      {!hasCompany ? (
+      {!hasCompany || showCreateAfterLiquidation ? (
         <div className="space-y-4">
           <div className="-mt-1">
             <input
@@ -370,10 +372,7 @@ function DetailItem({ label, value, positive, hint }: {
                     </div>
                   )}
                   <button
-                    onClick={() => {
-                      queryClient.invalidateQueries({ queryKey: ['company'] })
-                      setLiquidationResult(null)
-                    }}
+                    onClick={() => setShowCreateAfterLiquidation(true)}
                     className="btn btn-primary mt-4"
                   >
                     创建新公司
