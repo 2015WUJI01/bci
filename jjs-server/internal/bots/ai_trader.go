@@ -8,6 +8,7 @@ import (
 
 	"jjs-server/internal/config"
 	"jjs-server/internal/domain"
+	"jjs-server/internal/engine"
 	"jjs-server/internal/store"
 )
 
@@ -34,6 +35,14 @@ func InitTraders() []*AiTrader {
 
 		cash := randomRange(config.AiTraderInitCashMin, config.AiTraderInitCashMax)
 		store.GetOrCreatePlayerState(id, id)
+
+		orders, err := store.GetOpenOrdersByPlayer(id)
+		if err == nil {
+			for _, o := range orders {
+				engine.CancelOrderTx(store.DB, o.ID, id)
+			}
+		}
+
 		store.DB.Model(&domain.PlayerState{}).Where("player_id = ?", id).
 			Updates(map[string]interface{}{"cash": cash, "frozen_cash": 0})
 	}

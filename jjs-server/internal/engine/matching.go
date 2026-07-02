@@ -225,6 +225,9 @@ func executeBuy(tx *gorm.DB, order *domain.Order, stock *domain.Stock) (*Execute
 		order.Status = "cancelled"
 	}
 
+	if totalBuySpent > order.FrozenAmount {
+		totalBuySpent = order.FrozenAmount
+	}
 	if err := store.DeductFrozenCash(tx, order.PlayerID, totalBuySpent); err != nil {
 		tx.Rollback()
 		return nil, err
@@ -397,11 +400,15 @@ func executeSell(tx *gorm.DB, order *domain.Order, stock *domain.Stock) (*Execut
 			return nil, err
 		}
 
+		if buyCost > opp.FrozenAmount {
+			buyCost = opp.FrozenAmount
+		}
 		if err := store.DeductFrozenCash(tx, opp.PlayerID, buyCost); err != nil {
 			tx.Rollback()
 			return nil, err
 		}
-		if err := store.UpdateOrderFrozenAmount(tx, opp.ID, opp.FrozenAmount-buyCost); err != nil {
+		opp.FrozenAmount -= buyCost
+		if err := store.UpdateOrderFrozenAmount(tx, opp.ID, opp.FrozenAmount); err != nil {
 			tx.Rollback()
 			return nil, err
 		}
@@ -413,6 +420,11 @@ func executeSell(tx *gorm.DB, order *domain.Order, stock *domain.Stock) (*Execut
 			if opp.FrozenAmount > 0 {
 				remainingFrozen := opp.FrozenAmount
 				if err := store.UnfreezeCash(tx, opp.PlayerID, remainingFrozen); err != nil {
+					tx.Rollback()
+					return nil, err
+				}
+				opp.FrozenAmount = 0
+				if err := store.UpdateOrderFrozenAmount(tx, opp.ID, 0); err != nil {
 					tx.Rollback()
 					return nil, err
 				}
@@ -526,17 +538,13 @@ func executeSell(tx *gorm.DB, order *domain.Order, stock *domain.Stock) (*Execut
 	}, nil
 }
 
-func CancelOrder(db *gorm.DB, orderID uint, playerID string) error {
-	tx := db.Begin()
-
+func CancelOrderTx(tx *gorm.DB, orderID uint, playerID string) error {
 	order, err := store.GetOrderByIDAndPlayer(orderID, playerID)
 	if err != nil {
-		tx.Rollback()
 		return errors.New("订单不存在")
 	}
 
 	if order.Status != "open" && order.Status != "partial" {
-		tx.Rollback()
 		return errors.New("订单无法撤销")
 	}
 
@@ -544,7 +552,6 @@ func CancelOrder(db *gorm.DB, orderID uint, playerID string) error {
 
 	if order.Side == "buy" && order.FrozenAmount > 0 {
 		if err := store.UnfreezeCash(tx, order.PlayerID, order.FrozenAmount); err != nil {
-			tx.Rollback()
 			return err
 		}
 	}
@@ -552,22 +559,24 @@ func CancelOrder(db *gorm.DB, orderID uint, playerID string) error {
 	if order.Side == "sell" && unfilledQty > 0 {
 		holding, err := store.GetHolding(tx, order.PlayerID, order.StockID)
 		if err != nil {
-			tx.Rollback()
 			return err
 		}
 		if err := store.UnfreezeHoldingQty(tx, holding.ID, unfilledQty); err != nil {
-			tx.Rollback()
 			return err
 		}
 	}
 
 	order.Status = "cancelled"
 	order.FrozenAmount = 0
-	if err := tx.Save(order).Error; err != nil {
+	return tx.Save(order).Error
+}
+
+func CancelOrder(db *gorm.DB, orderID uint, playerID string) error {
+	tx := db.Begin()
+	if err := CancelOrderTx(tx, orderID, playerID); err != nil {
 		tx.Rollback()
 		return err
 	}
-
 	return tx.Commit().Error
 }
 

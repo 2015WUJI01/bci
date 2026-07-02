@@ -89,7 +89,6 @@ const (
 	MinPasswordLen = 3
 
 	BrokerScanTicks  = 5
-	StaleOrderTicks  = 10
 	SystemBrokerID   = "BROKER"
 
 	// AI 交易者 v2（烟蒂简化版）

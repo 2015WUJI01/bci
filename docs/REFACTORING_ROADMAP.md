@@ -429,7 +429,6 @@ internal/engine/
 | tick/季 | 150 (5分钟) |
 | K 线周期 | 15t(30s) / 60t(120s) / 150t(300s) |
 | 证券机构扫描间隔 | 5 tick |
-| 未成交买单超时 | 10 tick |
 
 ### P3.1: 数据模型变更与 Company IPO 字段 ✅ 完成 (2026-06-24)
 
@@ -531,7 +530,7 @@ internal/handler/
 - 持仓模型: `Holding.Qty / FrozenQty`，卖单调入冻结，成交扣减，Order 新增 `FrozenAmount` 追踪冻结额
 - 手续费: 买方佣金 0.025%（min ¥5），卖方佣金+印花税 0.1%
 - 撮合: 价格优先→同价时间优先(SeqNum)，限价单受阻价，市价单扫全部
-- 系统账号: `PlayerID="BROKER"` 接收 Broker 卖出资金。Broker 仅在买单价格 ≥ 现价 90% 时释放库存，防止低价倾销
+- 系统账号: `PlayerID="BROKER"` 接收 Broker 卖出资金。Broker 扫描时对比 `max(最优买价, 现价) × 0.9`，仅当买单价 ≥ 参考价 90% 时释放库存，防止价格背离时低价出货（2026-07-02 重构：移除超时概念，每 tick 取最优买单，`SELECT FOR UPDATE` 加锁防并发竞态）
 
 **产出**: 引擎+Store+最小API全部可用，无做空。
 
@@ -545,15 +544,15 @@ internal/engine/
 
 每 tick 流程（2s）:
 ```
-2. [每5tick] ReleaseBrokerInventory → 查stale buys → 过滤买单价≥现价90% → Broker按买价卖出库存
+1. [每5tick] ReleaseBrokerInventory → 查有库存的股票 → 取最优买单 → 价格门禁 max(最优买价,现价)×0.9 → Broker 按买价卖出
 2. updateAllStockPrices → 重算 Change = CurrentPrice - PrevClose, ChangePercent
-3. aggregateAllCandles → 用当前价更新40t/150t/600t三周期蜡烛
+3. aggregateAllCandles → 用当前价更新15t/60t/150t三周期蜡烛
 ```
 
 - 成交量/蜡烛实时更新：每笔成交在 `ExecuteOrder` 中同步调用 `updateCandlesForTrade`，不依赖 tick
 - `PriceTickInterval` 统一为 2s（修改 config.go，对齐设计文档）
 - `TradingTicker` 与季度 `Ticker` 并行运行，各自独立 goroutine
-- 新常量: `BrokerScanTicks=5` / `StaleOrderTicks=10` / `SystemBrokerID="BROKER"`
+- 新常量: `BrokerScanTicks=5` / `SystemBrokerID="BROKER"`
 
 **产出**: 2s tick goroutine + 行情更新 + K线三周期聚合。
 
@@ -657,7 +656,7 @@ internal/handler/
 - ✅ Symbol 前缀+自增序号生成 (P3.1)
 - ✅ 创建公司 API: total_shares → investor_shares 输入翻转 (P3.1)
 - ✅ 订单簿撮合引擎 (limit/market, 无做空, DB驱动) (P3.3)
-- ✅ 证券机构库存释放机制（BROKER系统账号, 每5tick, stale buys 10tick） (P3.3)
+- ✅ 证券机构库存释放机制（BROKER系统账号, 每5tick，最优买单优先，参考价门控 `max(bestBid, currentPrice)×0.9`，`FOR UPDATE` 行锁） (P3.3, 2026-07-02 重构)
 - ✅ 2s tick 主循环 + 行情更新 (Change/ChangePercent) (P3.4)
 - ✅ K 线 15t/60t/150t 三周期聚合（成交实时更新 + tick兜底） (P3.4)
 - ✅ 完整 REST API (8端点: 行情/下单/撤单/持仓/盘口/K线/挂单) (P3.5)

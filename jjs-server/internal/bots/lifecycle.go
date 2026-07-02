@@ -8,20 +8,36 @@ import (
 
 	"jjs-server/internal/config"
 	"jjs-server/internal/domain"
+	"jjs-server/internal/engine"
 	"jjs-server/internal/store"
 )
 
 func ResetTrader(db *gorm.DB, trader *AiTrader) error {
-	newCash := randomRange(config.AiTraderInitCashMin, config.AiTraderInitCashMax)
-	if err := db.Model(&domain.PlayerState{}).Where("player_id = ?", trader.ID).
-		Updates(map[string]interface{}{"cash": newCash, "frozen_cash": 0}).Error; err != nil {
+	tx := db.Begin()
+
+	orders, err := store.GetOpenOrdersByPlayer(trader.ID)
+	if err != nil {
+		tx.Rollback()
 		return err
 	}
-	db.Where("player_id = ?", trader.ID).Delete(&domain.Holding{})
+	for _, o := range orders {
+		if err := engine.CancelOrderTx(tx, o.ID, trader.ID); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	newCash := randomRange(config.AiTraderInitCashMin, config.AiTraderInitCashMax)
+	if err := tx.Model(&domain.PlayerState{}).Where("player_id = ?", trader.ID).
+		Updates(map[string]interface{}{"cash": newCash, "frozen_cash": 0}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	tx.Where("player_id = ?", trader.ID).Delete(&domain.Holding{})
 	trader.CooldownTicks, trader.RiskTolerance = newTraderParams()
 	trader.CoolDownLeft = 0
 	trader.SpawnedAt = time.Now()
-	return nil
+	return tx.Commit().Error
 }
 
 func CheckAndReplenish(db *gorm.DB, traders []*AiTrader) {
@@ -87,14 +103,36 @@ func RestoreTraders(db *gorm.DB) []*AiTrader {
 			}
 		}
 
-		db.Where("player_id = ?", id).Delete(&domain.Holding{})
-		_, err := store.GetOrCreatePlayerState(id, id)
+		tx := db.Begin()
+
+		orders, err := store.GetOpenOrdersByPlayer(id)
 		if err != nil {
+			tx.Rollback()
+			continue
+		}
+		cancelFailed := false
+		for _, o := range orders {
+			if err := engine.CancelOrderTx(tx, o.ID, id); err != nil {
+				cancelFailed = true
+				break
+			}
+		}
+		if cancelFailed {
+			tx.Rollback()
+			continue
+		}
+
+		tx.Where("player_id = ?", id).Delete(&domain.Holding{})
+		if _, err := store.GetOrCreatePlayerState(id, id); err != nil {
+			tx.Rollback()
 			continue
 		}
 		cash := randomRange(config.AiTraderInitCashMin, config.AiTraderInitCashMax)
-		db.Model(&domain.PlayerState{}).Where("player_id = ?", id).
+		tx.Model(&domain.PlayerState{}).Where("player_id = ?", id).
 			Updates(map[string]interface{}{"cash": cash, "frozen_cash": 0})
+		if err := tx.Commit().Error; err != nil {
+			continue
+		}
 
 		cd, rt := newTraderParams()
 		traders = append(traders, &AiTrader{

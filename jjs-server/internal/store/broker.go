@@ -6,6 +6,12 @@ import (
 	"jjs-server/internal/domain"
 )
 
+func ListActiveBrokerInventories() ([]domain.BrokerInventory, error) {
+	var inventories []domain.BrokerInventory
+	err := DB.Where("total_qty > 0").Find(&inventories).Error
+	return inventories, err
+}
+
 func GetBrokerInventory(stockID uint) (*domain.BrokerInventory, error) {
 	var bi domain.BrokerInventory
 	if err := DB.Where("stock_id = ?", stockID).First(&bi).Error; err != nil {

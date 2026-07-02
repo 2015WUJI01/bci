@@ -6,6 +6,12 @@ import (
 	"jjs-server/internal/domain"
 )
 
+func GetStocksByIDs(ids []uint) ([]domain.Stock, error) {
+	var stocks []domain.Stock
+	err := DB.Where("id IN ?", ids).Find(&stocks).Error
+	return stocks, err
+}
+
 func ListStocks() ([]domain.Stock, error) {
 	var stocks []domain.Stock
 	err := DB.Find(&stocks).Error

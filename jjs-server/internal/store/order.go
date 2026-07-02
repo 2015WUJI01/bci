@@ -1,8 +1,6 @@
 package store
 
 import (
-	"time"
-
 	"gorm.io/gorm"
 
 	"jjs-server/internal/domain"
@@ -63,12 +61,24 @@ func GetOpenOrdersByPlayer(playerID string) ([]domain.Order, error) {
 	return orders, err
 }
 
-func GetStaleBuyOrders(stockID uint, olderThan time.Time) ([]domain.Order, error) {
-	var orders []domain.Order
-	err := DB.Where("stock_id = ? AND side = 'buy' AND status IN ('open','partial') AND created_at < ?", stockID, olderThan).
+func GetBestOpenBuyOrder(stockID uint) (*domain.Order, error) {
+	var order domain.Order
+	err := DB.Where("stock_id = ? AND side = 'buy' AND status IN ('open','partial')", stockID).
 		Order("price DESC, seq_num ASC").
-		Find(&orders).Error
-	return orders, err
+		First(&order).Error
+	if err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
+func GetBestBid(stockID uint) (int64, error) {
+	var price int64
+	err := DB.Model(&domain.Order{}).
+		Select("COALESCE(MAX(price), 0)").
+		Where("stock_id = ? AND side = 'buy' AND type = 'limit' AND status IN ('open','partial')", stockID).
+		Scan(&price).Error
+	return price, err
 }
 
 func UpdateOrderFrozenAmount(tx *gorm.DB, orderID uint, frozenAmount int64) error {
