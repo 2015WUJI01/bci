@@ -224,7 +224,10 @@ export function PortfolioPage() {
                   <tr key={o.id} className="border-b border-border/40">
                     <td className="py-1.5 px-2 text-text-primary font-medium">{o.symbol ?? `#${o.stock_id}`}</td>
                     <td className={`py-1.5 px-2 font-bold ${o.side === 'buy' ? 'text-up' : 'text-down'}`}>
-                      {o.side === 'buy' ? '买入' : '卖出'}
+                      <span className="hidden sm:inline">{o.side === 'buy' ? '买入' : '卖出'}</span>
+                      <span className="sm:hidden">
+                        {o.side === 'buy' ? '买' : '卖'} ¥{o.price > 0 ? fmtYuan(o.price / 100) : '市价'}
+                      </span>
                     </td>
                     <td className="text-right py-1.5 px-2 font-mono text-text-muted hidden sm:table-cell">
                       {o.price > 0 ? fmtYuan(o.price / 100) : '市价'}
