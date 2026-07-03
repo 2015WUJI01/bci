@@ -98,8 +98,9 @@ func executeBuy(tx *gorm.DB, order *domain.Order, stock *domain.Stock) (*Execute
 
 	var opponentOrders []domain.Order
 	if order.Type == "limit" {
-		if err := tx.Where("stock_id = ? AND side = 'sell' AND type = 'limit' AND status IN ('open','partial') AND price <= ?",
-			order.StockID, order.Price).
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("stock_id = ? AND side = 'sell' AND type = 'limit' AND status IN ('open','partial') AND price <= ?",
+				order.StockID, order.Price).
 			Order("price ASC, seq_num ASC").
 			Find(&opponentOrders).Error; err != nil {
 			tx.Rollback()
@@ -322,8 +323,9 @@ func executeSell(tx *gorm.DB, order *domain.Order, stock *domain.Stock) (*Execut
 
 	var opponentOrders []domain.Order
 	if order.Type == "limit" {
-		if err := tx.Where("stock_id = ? AND side = 'buy' AND type = 'limit' AND status IN ('open','partial') AND price >= ?",
-			order.StockID, order.Price).
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("stock_id = ? AND side = 'buy' AND type = 'limit' AND status IN ('open','partial') AND price >= ?",
+				order.StockID, order.Price).
 			Order("price DESC, seq_num ASC").
 			Find(&opponentOrders).Error; err != nil {
 			tx.Rollback()
