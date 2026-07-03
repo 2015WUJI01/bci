@@ -74,3 +74,67 @@ func GetOrderBook(stockID uint) (bids []OrderBookLevel, asks []OrderBookLevel, e
 
 	return bids, asks, nil
 }
+
+type StockOrderBook struct {
+	StockID uint
+	Bids    []OrderBookLevel
+	Asks    []OrderBookLevel
+}
+
+func GetAllOrderBooks(stockIDs []uint) (map[uint]StockOrderBook, error) {
+	if len(stockIDs) == 0 {
+		return map[uint]StockOrderBook{}, nil
+	}
+
+	type rawRow struct {
+		StockID uint  `gorm:"column:stock_id"`
+		Price   int64 `gorm:"column:price"`
+		Volume  int64 `gorm:"column:volume"`
+	}
+
+	var bids []rawRow
+	err := DB.Raw(`
+		SELECT stock_id, price, volume FROM (
+			SELECT stock_id, price, SUM(qty - filled_qty) as volume,
+				ROW_NUMBER() OVER (PARTITION BY stock_id ORDER BY price DESC) as rn
+			FROM orders
+			WHERE stock_id IN ? AND side = 'buy' AND type = 'limit' AND status IN ('open','partial')
+			GROUP BY stock_id, price
+		) t WHERE rn <= 5
+		ORDER BY stock_id, price DESC
+	`, stockIDs).Scan(&bids).Error
+	if err != nil {
+		return nil, err
+	}
+
+	var asks []rawRow
+	err = DB.Raw(`
+		SELECT stock_id, price, volume FROM (
+			SELECT stock_id, price, SUM(qty - filled_qty) as volume,
+				ROW_NUMBER() OVER (PARTITION BY stock_id ORDER BY price ASC) as rn
+			FROM orders
+			WHERE stock_id IN ? AND side = 'sell' AND type = 'limit' AND status IN ('open','partial')
+			GROUP BY stock_id, price
+		) t WHERE rn <= 5
+		ORDER BY stock_id, price ASC
+	`, stockIDs).Scan(&asks).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[uint]StockOrderBook, len(stockIDs))
+	for _, b := range bids {
+		ob := result[b.StockID]
+		ob.StockID = b.StockID
+		ob.Bids = append(ob.Bids, OrderBookLevel{Price: b.Price, Volume: b.Volume})
+		result[b.StockID] = ob
+	}
+	for _, a := range asks {
+		ob := result[a.StockID]
+		ob.StockID = a.StockID
+		ob.Asks = append(ob.Asks, OrderBookLevel{Price: a.Price, Volume: a.Volume})
+		result[a.StockID] = ob
+	}
+
+	return result, nil
+}

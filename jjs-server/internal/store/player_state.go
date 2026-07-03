@@ -18,6 +18,21 @@ func GetPlayerState(playerID string) (*domain.PlayerState, error) {
 	return &ps, nil
 }
 
+func GetPlayerStatesByIDs(playerIDs []string) (map[string]*domain.PlayerState, error) {
+	if len(playerIDs) == 0 {
+		return map[string]*domain.PlayerState{}, nil
+	}
+	var list []domain.PlayerState
+	if err := DB.Where("player_id IN ?", playerIDs).Find(&list).Error; err != nil {
+		return nil, err
+	}
+	result := make(map[string]*domain.PlayerState, len(list))
+	for i := range list {
+		result[list[i].PlayerID] = &list[i]
+	}
+	return result, nil
+}
+
 func GetOrCreatePlayerState(playerID, nickname string) (*domain.PlayerState, error) {
 	ps, err := GetPlayerState(playerID)
 	if err == nil {

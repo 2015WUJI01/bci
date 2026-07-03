@@ -61,6 +61,23 @@ func GetOpenOrdersByPlayer(playerID string) ([]domain.Order, error) {
 	return orders, err
 }
 
+func GetOpenOrdersByPlayerIDs(playerIDs []string) (map[string][]domain.Order, error) {
+	if len(playerIDs) == 0 {
+		return map[string][]domain.Order{}, nil
+	}
+	var orders []domain.Order
+	if err := DB.Where("player_id IN ? AND status IN ('open','partial')", playerIDs).
+		Order("created_at DESC").
+		Find(&orders).Error; err != nil {
+		return nil, err
+	}
+	result := make(map[string][]domain.Order, len(playerIDs))
+	for _, o := range orders {
+		result[o.PlayerID] = append(result[o.PlayerID], o)
+	}
+	return result, nil
+}
+
 func GetAllOpenOrdersByStock(stockID uint) ([]domain.Order, error) {
 	var orders []domain.Order
 	err := DB.Where("stock_id = ? AND status IN ('open','partial')", stockID).

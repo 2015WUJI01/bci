@@ -88,16 +88,9 @@ func buildBuyOrderV2(trader *AiTrader, stock *domain.Stock, ps *domain.PlayerSta
 	}
 }
 
-func buildSellOrderV2(trader *AiTrader, stock *domain.Stock, expectedPrice float64) *domain.Order {
-	holdings, _ := store.GetHoldingsByPlayer(trader.ID)
-	var holding *domain.Holding
-	for i := range holdings {
-		if holdings[i].StockID == stock.ID {
-			holding = &holdings[i]
-			break
-		}
-	}
-	if holding == nil || holding.Qty-holding.FrozenQty < 100 {
+func buildSellOrderV2(trader *AiTrader, stock *domain.Stock, expectedPrice float64, holdingMap map[uint]*domain.Holding) *domain.Order {
+	holding, ok := holdingMap[stock.ID]
+	if !ok || holding == nil || holding.Qty-holding.FrozenQty < 100 {
 		return nil
 	}
 

@@ -30,7 +30,7 @@ func NewScheduler(traders []*AiTrader) *Scheduler {
 	}
 }
 
-func (s *Scheduler) ScheduleTick(db *gorm.DB) {
+func (s *Scheduler) ScheduleTick(db *gorm.DB, stocks []domain.Stock) {
 	start := time.Now()
 	s.tickCount++
 
@@ -47,11 +47,6 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 	s.mu.Unlock()
 
 	if len(ready) == 0 {
-		return
-	}
-
-	stocks, err := store.ListStocks()
-	if err != nil || len(stocks) == 0 {
 		return
 	}
 
@@ -84,12 +79,21 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 		return
 	}
 
+	readyIDs := make([]string, len(ready))
+	for i, t := range ready {
+		readyIDs[i] = t.ID
+	}
+
+	playerStates, _ := store.GetPlayerStatesByIDs(readyIDs)
+	allHoldings, _ := store.GetHoldingsByPlayerIDs(readyIDs)
+	allOpenOrders, _ := store.GetOpenOrdersByPlayerIDs(readyIDs)
+
 	depleted := 0
 	for _, trader := range ready {
-		openOrders, _ := store.GetOpenOrdersByPlayer(trader.ID)
+		openOrders := allOpenOrders[trader.ID]
 		for _, o := range openOrders {
-			s, ok := stockByID[o.StockID]
-			if !ok || s.CurrentPrice <= 0 {
+			st, ok := stockByID[o.StockID]
+			if !ok || st.CurrentPrice <= 0 {
 				engine.CancelOrder(db, o.ID, trader.ID)
 				continue
 			}
@@ -98,12 +102,12 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 				continue
 			}
 			if o.Side == "buy" {
-				gap := float64(s.CurrentPrice-o.Price) / float64(s.CurrentPrice)
+				gap := float64(st.CurrentPrice-o.Price) / float64(st.CurrentPrice)
 				if gap > config.AiTraderCancelDevThreshold {
 					engine.CancelOrder(db, o.ID, trader.ID)
 				}
 			} else {
-				gap := float64(o.Price-s.CurrentPrice) / float64(s.CurrentPrice)
+				gap := float64(o.Price-st.CurrentPrice) / float64(st.CurrentPrice)
 				if gap > config.AiTraderCancelDevThreshold {
 					engine.CancelOrder(db, o.ID, trader.ID)
 				}
@@ -120,11 +124,11 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 			continue
 		}
 
-		ps, err := store.GetPlayerState(trader.ID)
-		if err != nil {
+		ps, ok := playerStates[trader.ID]
+		if !ok {
 			continue
 		}
-		holdings, _ := store.GetHoldingsByPlayer(trader.ID)
+		holdings := allHoldings[trader.ID]
 		holdingMap := make(map[uint]*domain.Holding, len(holdings))
 		for i := range holdings {
 			holdingMap[holdings[i].StockID] = &holdings[i]
@@ -136,7 +140,11 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 			}
 
 			if h, ok := holdingMap[stock.ID]; ok {
-				if CheckStopLoss(s.placeOrderInternal, trader, stock, h) {
+				stopOrderFunc := func(order *domain.Order) error {
+					_, err := engine.ExecuteOrderWithStock(db, order, stock)
+					return err
+				}
+				if CheckStopLoss(stopOrderFunc, trader, stock, h) {
 					s.metrics.RecordStopLoss()
 					continue
 				}
@@ -177,20 +185,18 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 			if rand.Float64() < buyProb {
 				order = buildBuyOrderV2(trader, stock, ps, expectedPrice)
 			} else {
-				order = buildSellOrderV2(trader, stock, expectedPrice)
+				order = buildSellOrderV2(trader, stock, expectedPrice, holdingMap)
 			}
 
 			if order == nil {
 				continue
 			}
 
-			if s.PlaceOrder != nil {
-				if err := s.PlaceOrder(order); err != nil {
-					slog.Debug("bot order failed", "bot", trader.ID, "stock", stock.Symbol, "error", err)
-					continue
-				}
-				s.metrics.RecordOrder(order.Side)
+			if _, err := engine.ExecuteOrderWithStock(db, order, stock); err != nil {
+				slog.Debug("bot order failed", "bot", trader.ID, "stock", stock.Symbol, "error", err)
+				continue
 			}
+			s.metrics.RecordOrder(order.Side)
 		}
 
 		trader.CoolDownLeft = trader.CooldownTicks
@@ -216,13 +222,6 @@ func (s *Scheduler) ScheduleTick(db *gorm.DB) {
 	if elapsed > 1_000_000 {
 		slog.Warn("AI tick slow", "us", elapsed)
 	}
-}
-
-func (s *Scheduler) placeOrderInternal(order *domain.Order) error {
-	if s.PlaceOrder == nil {
-		return nil
-	}
-	return s.PlaceOrder(order)
 }
 
 func sampleStocks(stocks []*domain.Stock) []*domain.Stock {

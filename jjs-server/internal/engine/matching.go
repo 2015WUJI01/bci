@@ -64,7 +64,10 @@ func ExecuteOrder(db *gorm.DB, order *domain.Order) (*ExecuteResult, error) {
 	if err != nil {
 		return nil, errors.New("股票不存在")
 	}
+	return ExecuteOrderWithStock(db, order, stock)
+}
 
+func ExecuteOrderWithStock(db *gorm.DB, order *domain.Order, stock *domain.Stock) (*ExecuteResult, error) {
 	order.SeqNum = NextSeqNum()
 	order.CreatedAt = time.Now()
 

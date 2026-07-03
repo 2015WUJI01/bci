@@ -13,7 +13,7 @@ import (
 )
 
 type BotRunner interface {
-	ScheduleTick(db *gorm.DB)
+	ScheduleTick(db *gorm.DB, stocks []domain.Stock)
 }
 
 type TradingTicker struct {
@@ -67,24 +67,24 @@ func (t *TradingTicker) onTick() {
 		go ReleaseBrokerInventory(store.DB)
 	}
 
-	candlesByStock := t.aggregateAllCandles()
-
-	if t.botRunner != nil {
-		t.botRunner.ScheduleTick(store.DB)
-	}
-
-	if t.hub != nil {
-		t.broadcastPriceUpdate(candlesByStock)
-		t.broadcastOrderBooks()
-	}
-}
-
-func (t *TradingTicker) broadcastPriceUpdate(candlesByStock map[uint]map[string]domain.Candle) {
 	stocks, err := store.ListStocks()
 	if err != nil {
 		return
 	}
 
+	candlesByStock := t.aggregateAllCandles(stocks)
+
+	if t.botRunner != nil {
+		t.botRunner.ScheduleTick(store.DB, stocks)
+	}
+
+	if t.hub != nil {
+		t.broadcastPriceUpdate(stocks, candlesByStock)
+		t.broadcastOrderBooks(stocks)
+	}
+}
+
+func (t *TradingTicker) broadcastPriceUpdate(stocks []domain.Stock, candlesByStock map[uint]map[string]domain.Candle) {
 	companies, err := store.GetActiveCompanies()
 	if err != nil {
 		return
@@ -99,12 +99,7 @@ func (t *TradingTicker) broadcastPriceUpdate(candlesByStock map[uint]map[string]
 	t.hub.Broadcast(msg)
 }
 
-func (t *TradingTicker) aggregateAllCandles() map[uint]map[string]domain.Candle {
-	stocks, err := store.ListStocks()
-	if err != nil {
-		return nil
-	}
-
+func (t *TradingTicker) aggregateAllCandles(stocks []domain.Stock) map[uint]map[string]domain.Candle {
 	candlesByStock := make(map[uint]map[string]domain.Candle, len(stocks))
 
 	for _, s := range stocks {
@@ -138,8 +133,13 @@ func candleOpenTime(t time.Time, periodSecs int64) time.Time {
 	return time.Unix(unix-(unix%periodSecs), 0).UTC()
 }
 
-func (t *TradingTicker) broadcastOrderBooks() {
-	stocks, err := store.ListStocks()
+func (t *TradingTicker) broadcastOrderBooks(stocks []domain.Stock) {
+	stockIDs := make([]uint, 0, len(stocks))
+	for _, s := range stocks {
+		stockIDs = append(stockIDs, s.ID)
+	}
+
+	allBooks, err := store.GetAllOrderBooks(stockIDs)
 	if err != nil {
 		return
 	}
@@ -149,14 +149,12 @@ func (t *TradingTicker) broadcastOrderBooks() {
 		Asks []store.OrderBookLevel
 	}, len(stocks))
 	for _, s := range stocks {
-		bids, asks, err := store.GetOrderBook(s.ID)
-		if err != nil {
-			continue
+		if ob, ok := allBooks[s.ID]; ok {
+			books[s.Symbol] = struct {
+				Bids []store.OrderBookLevel
+				Asks []store.OrderBookLevel
+			}{ob.Bids, ob.Asks}
 		}
-		books[s.Symbol] = struct {
-			Bids []store.OrderBookLevel
-			Asks []store.OrderBookLevel
-		}{bids, asks}
 	}
 	if len(books) == 0 {
 		return
