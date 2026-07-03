@@ -92,7 +92,8 @@ func main() {
 	}
 
 	adminH := handler.NewAdminHandler(scheduler)
-	r := router.New(authH, playerH, companyH, marketH, tradeH, wsH, adminH)
+	leaderboardH := &handler.LeaderboardHandler{}
+	r := router.New(authH, playerH, companyH, marketH, tradeH, wsH, adminH, leaderboardH)
 
 	srv := &http.Server{
 		Addr:         ":" + config.AppConfig.Port,

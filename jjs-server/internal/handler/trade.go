@@ -208,7 +208,7 @@ func (h *TradeHandler) Portfolio(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	totalValue := ps.Cash + totalMarketValue/100
+	totalValue := ps.Cash + ps.FrozenCash + totalMarketValue/100
 
 	WriteJSON(w, http.StatusOK, portfolioResponse{
 		Cash:       ps.Cash,

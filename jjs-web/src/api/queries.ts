@@ -4,7 +4,8 @@ import type {
   StockInfo,
   KlineBar,
   KlinePeriod,
-  LeaderboardEntry,
+  PlayerLeaderboardEntry,
+  CompanyLeaderboardEntry,
   NewsItem,
   PortfolioState,
   CompanyState,
@@ -36,6 +37,8 @@ export const portfolioKeys = {
 
 export const marketKeys = {
   leaders: ['leaderboard'] as const,
+  playerLeaders: ['leaderboard', 'players'] as const,
+  companyLeaders: ['leaderboard', 'companies'] as const,
   news: ['news'] as const,
 }
 
@@ -144,10 +147,19 @@ export function usePendingOrders() {
   })
 }
 
-export function useLeaderboard() {
-  return useQuery<LeaderboardEntry[]>({
-    queryKey: marketKeys.leaders,
-    queryFn: () => api.get('/leaderboard'),
+export function usePlayerLeaderboard() {
+  return useQuery<{ players: PlayerLeaderboardEntry[] }>({
+    queryKey: marketKeys.playerLeaders,
+    queryFn: () => api.get('/leaderboard/players'),
+    refetchInterval: 7500,
+  })
+}
+
+export function useCompanyLeaderboard() {
+  return useQuery<{ companies: CompanyLeaderboardEntry[] }>({
+    queryKey: marketKeys.companyLeaders,
+    queryFn: () => api.get('/leaderboard/companies'),
+    refetchInterval: 7500,
   })
 }
 

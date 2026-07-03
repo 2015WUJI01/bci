@@ -728,13 +728,56 @@ internal/engine/
 └── leaderboard.go                 # 排行榜（所有玩家按总资产排序）
 ```
 
+### P5.1: 排行榜 ✅ 完成 (2026-07-03)
+
+> 实际实现位置与 P5 原计划不同：排行榜逻辑在 `internal/handler/leaderboard.go`（非 engine），Store 辅助函数在 `internal/store/leaderboard.go`。
+
+**API**:
+
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/leaderboard/players` | 公开 | 个人排行：按总资产（Cash + FrozenCash + 持仓市值 - MarginDebt）降序排列，排除 bot_% 和 BROKER |
+| GET | `/api/leaderboard/companies` | 公开 | 公司排行：已上市按市值（股价 × 总股本），未上市按 IPO 公式估算估值（NAV + EPS × PE × 景气度），仅 active 公司 |
+
+**个人排行总资产公式**：
+```
+totalAssets = Cash + FrozenCash + Σ(holding.Qty × stock.CurrentPrice / 100) - MarginDebt
+```
+（`FrozenCash` 为挂买单冻结资金，仍属玩家资产）
+
+**公司估值公式（未上市）**：
+```
+totalAssets = Cash + CapCount × CapAssetValue
+nav = totalAssets / TotalShares
+eps = avg(近4季净利润) / TotalShares
+price = max(1, nav + eps × PE × prosperity)
+valuation = price × TotalShares
+```
+
+**前端**：
+- `LeaderboardPage.tsx`：双标签页（个人排行/公司排行），7.5s 自动刷新
+- 前三名金银铜高亮，isMe 蓝色左边框
+- 响应式表格：手机端隐藏行业/股价列
+
+**新增/变更文件**：
+
+| 文件 | 变更 |
+|------|------|
+| `internal/store/leaderboard.go` | **新增**：`GetHumanPlayerStates()` + `GetHoldingsByPlayerIDs()` |
+| `internal/handler/leaderboard.go` | **新增**：`Players()` + `Companies()` 端点 |
+| `internal/router/router.go` | 注册 `/api/leaderboard/players` + `/api/leaderboard/companies` |
+| `cmd/server/main.go` | 实例化 `LeaderboardHandler` |
+| `internal/handler/trade.go` | `Portfolio` 总资产公式加入 `FrozenCash` |
+| 前端 `types/index.ts` | 新增 `PlayerLeaderboardEntry` + `CompanyLeaderboardEntry` |
+| 前端 `api/queries.ts` | 新增 `usePlayerLeaderboard()` + `useCompanyLeaderboard()` |
+| 前端 `pages/LeaderboardPage.tsx` | 完整重写，替代占位 |
+
 ### 实现要点
 
 - 强制平仓：每个 tick 检查维持担保比例 < 130%
 - SEC 监管：持仓 > 25% 流通股罚金，60 tick 内 > 30 笔交易限制；公司被 SEC 罚款联动董事会满意度 -10
 - 市场新闻：根据价格波动、成交量异常、公司财报季等自动生成广播
-- 排行榜：按总资产（现金 + 持仓市值 - 融券负债）排序
-- GORM 模型：`MarginAccount`, `TradeRecord`, `NewsItem`
+- ⏳ 融资融券、SEC 监管、市场新闻 待实现
 
 ---
 
@@ -994,6 +1037,7 @@ internal/handler/
 ## 里程碑汇总
 
 ```
+✅ 排行榜 完成 (2026-07-03): 个人排行 + 公司排行，双标签页，7.5s 自动刷新
 ✅ P1 完成 (2026-06-18): 项目骨架（Go+GORM+MySQL + React 骨架可运行）
 ✅ P2.1 完成 (2026-06-18): 行业配置 + 三维数据模型 + 公司创建/查询 API + 路由拆分
 ✅ P2.2 完成 (2026-06-23): 扩产/招人行动系统（每季3次硬限制，建造队列）

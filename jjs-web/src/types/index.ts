@@ -144,12 +144,24 @@ export interface NewsItem {
   symbol?: string
 }
 
-export interface LeaderboardEntry {
+export interface PlayerLeaderboardEntry {
   rank: number
+  player_id: string
   nickname: string
-  totalAssets: number
-  pnl: number
-  isMe: boolean
+  total_assets: number
+  cash: number
+  frozen_cash: number
+  holdings_value: number
+}
+
+export interface CompanyLeaderboardEntry {
+  rank: number
+  symbol: string
+  name: string
+  industry: string
+  valuation: number
+  listed: boolean
+  stock_price: number
 }
 
 export interface PendingOrder {

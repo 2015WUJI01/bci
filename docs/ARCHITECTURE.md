@@ -464,4 +464,61 @@ matching.go / broker.go
 | MarketPage 五档盘口 | `liveOrderBooks[selectedSymbol]` (WS, 每2s) → fallback `detail.bids/asks` (REST) | WS 优先 |
 | MarketPage K线图 | REST `kline` + `gameStore.stocks[symbol].candles[period]` (WS) → 本地合并ASC去重 | 混合 |
 | MarketPage 分时图 | `tickBuffer` (WS `price_update` 缓冲, 300点) | WS 独占 |
+| LeaderboardPage 个人排行 | REST `/api/leaderboard/players` (7.5s 轮询) | REST 独占 |
+| LeaderboardPage 公司排行 | REST `/api/leaderboard/companies` (7.5s 轮询) | REST 独占 |
+
+---
+
+## 新系统 API 路由表 (Go + React)
+
+### Auth
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| POST | `/api/auth/register` | — | 注册 |
+| POST | `/api/auth/login` | — | 登录 |
+| GET | `/api/auth/me` | 可选 | 当前用户信息 |
+
+### Player
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/player/info` | JWT | 玩家基础信息 + 现金 + 全局季度 |
+
+### Company
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| POST | `/api/company/create` | JWT | 创建公司 |
+| POST | `/api/company/actions` | JWT | 提交经营操作 |
+| POST | `/api/company/ipo` | JWT | 发起 IPO |
+| GET | `/api/company/ipo/status` | JWT | IPO 条件进度 |
+| GET | `/api/company/state` | JWT | 公司完整状态 |
+| GET | `/api/company/quarterly` | JWT | 季度财报历史 |
+| POST | `/api/company/liquidate` | JWT | 破产清算 |
+
+### Market
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/market/stocks` | — | 股票列表（可选 `?period=`） |
+| GET | `/api/market/stock/{symbol}` | — | 单股详情 |
+| GET | `/api/market/kline/{symbol}` | — | K 线数据 |
+| GET | `/api/market/orderbook/{symbol}` | — | 盘口五档 |
+
+### Trade
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| POST | `/api/trade/order` | JWT | 下单 |
+| DELETE | `/api/trade/order` | JWT | 撤单 |
+| GET | `/api/trade/orders` | JWT | 我的挂单 |
+| GET | `/api/portfolio` | JWT | 持仓 + 总资产（Cash + FrozenCash + 持仓市值） |
+
+### Leaderboard
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/leaderboard/players` | — | 个人排行（排除 bot_% 和 BROKER） |
+| GET | `/api/leaderboard/companies` | — | 公司排行（active 公司，上市按市值/未上市按 IPO 估值） |
+
+### Admin
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| GET | `/api/admin/bots/metrics` | JWT | Bot 指标 |
+| GET | `/api/admin/bots/traders` | JWT | Bot 交易者列表 |
 ```
