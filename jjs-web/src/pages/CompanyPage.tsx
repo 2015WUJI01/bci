@@ -83,7 +83,7 @@ export function CompanyPage() {
   const [error, setError] = useState('')
   const [showGuide, setShowGuide] = useState(false)
   const [showActions, setShowActions] = useState(false)
-  const [actionView, setActionView] = useState<'selection' | 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing' | 'inject_capital'>('selection')
+  const [actionView, setActionView] = useState<'selection' | 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing' | 'inject_capital' | 'dividend'>('selection')
   const [actionAmount, setActionAmount] = useState(0)
   const [actionsSubmitted, setActionsSubmitted] = useState(0)
   useEffect(() => {
@@ -154,7 +154,7 @@ export function CompanyPage() {
     }
   }
 
-  const handleSubmitAction = async (type: 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing' | 'inject_capital', amount: number) => {
+  const handleSubmitAction = async (type: 'expand' | 'hire' | 'layoff' | 'sell_assets' | 'marketing' | 'inject_capital' | 'dividend', amount: number) => {
     if (!company) return
     setSubmittingActions(true)
     setActionError('')
@@ -406,6 +406,7 @@ function DetailItem({ label, value, positive, hint }: {
             sell_assets: { title: '资产处置', inputLabel: ind.sellLabel, unit: ind.sellUnit },
             marketing: { title: '营销推广', inputLabel: '投入金额', unit: '¥' },
             inject_capital: { title: '个人注资', inputLabel: '注资金额', unit: '¥' },
+            dividend: { title: '现金分红', inputLabel: '每股分红', unit: '¥' },
           }
 
           let maxAmount: number
@@ -427,6 +428,10 @@ function DetailItem({ label, value, positive, hint }: {
           } else if (actionView === 'inject_capital') {
             maxAmount = playerInfo?.cash ?? 0
             cost = 0
+          } else if (actionView === 'dividend') {
+            const distShares = company.ipo_quarter > 0 ? company.total_shares : company.ceo_shares
+            maxAmount = Math.floor(company.cash / distShares * 100) / 100
+            cost = Math.round(actionAmount * 100) * distShares / 100
           } else {
             maxAmount = Math.floor(company.cash)
             cost = actionAmount
@@ -813,6 +818,19 @@ function DetailItem({ label, value, positive, hint }: {
                         <div className="text-xs text-text-muted">
                           投入资金提升当季需求
                         </div>
+                       </button>
+
+                      <button
+                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-up hover:bg-up/5 transition-colors"
+                        onClick={() => { setActionView('dividend'); setActionAmount(0); setActionError('') }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">💵</span>
+                          <span className="text-sm font-semibold text-text-primary">现金分红</span>
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          {company.ipo_quarter > 0 ? '向所有股东分红 · 按持股比例' : '向CEO分红'}
+                        </div>
                       </button>
 
                       <button
@@ -854,7 +872,9 @@ function DetailItem({ label, value, positive, hint }: {
                             {actionConfig[actionView]?.inputLabel}
                           </span>
                           <span className="text-text-primary font-semibold">
-                            {actionAmount.toLocaleString()}{' '}
+                            {actionView === 'dividend'
+                              ? actionAmount.toFixed(2)
+                              : actionAmount.toLocaleString()}{' '}
                             {actionConfig[actionView]?.unit}
                           </span>
                         </div>
@@ -862,7 +882,7 @@ function DetailItem({ label, value, positive, hint }: {
                           type="range"
                           min={0}
                           max={maxAmount}
-                          step={1}
+                          step={actionView === 'dividend' ? 0.01 : 1}
                           value={actionAmount}
                           onChange={(e) => setActionAmount(Number(e.target.value))}
                           className="w-full accent-accent-blue"
@@ -917,6 +937,10 @@ function DetailItem({ label, value, positive, hint }: {
                             <span>{isMfg ? `¥${Math.round(80000 * 0.75).toLocaleString()}/条 · 当前 ${company.cap_count} 条` : `¥${(2.0 * 0.75).toFixed(1)}/单位 · 当前 ${company.cap_count.toLocaleString()} 单位`}</span>
                           ) : actionView === 'inject_capital' ? (
                             <span>注资后公司现金 ¥{company.cash.toLocaleString()} → ¥{(company.cash + actionAmount).toLocaleString()}</span>
+                          ) : actionView === 'dividend' ? (
+                            <span>{actionAmount > 0
+                              ? `${company.ipo_quarter > 0 ? company.total_shares.toLocaleString() : company.ceo_shares.toLocaleString()} 股 × ¥${actionAmount.toFixed(2)} = ¥${Math.round(cost).toLocaleString()}`
+                              : `${company.ipo_quarter > 0 ? '向所有股东分红' : '仅向CEO分红'} · 每股 ¥0.01 起`}</span>
                           ) : actionAmount > 0 ? (() => {
                               const base = marketingScale * Math.pow(actionAmount, marketingExponent)
                               const minB = Math.round(base * 0.85)
@@ -938,6 +962,8 @@ function DetailItem({ label, value, positive, hint }: {
                           <>出售收入 <span className="font-semibold text-up">¥{income.toLocaleString()}</span></>
                         ) : actionView === 'inject_capital' ? (
                           <>从个人账户转入 <span className={`font-semibold ${actionAmount > (playerInfo?.cash ?? 0) ? 'text-down' : 'text-accent-gold'}`}>¥{actionAmount.toLocaleString()}</span></>
+                        ) : actionView === 'dividend' ? (
+                          <>总分红金额 <span className={`font-semibold ${cost > company.cash ? 'text-down' : 'text-up'}`}>¥{Math.round(cost).toLocaleString()}</span></>
                         ) : (
                           <>成本 <span className={`font-semibold ${cost > company.cash ? 'text-down' : 'text-text-primary'}`}>¥{cost.toLocaleString()}</span></>
                         )}
@@ -948,7 +974,7 @@ function DetailItem({ label, value, positive, hint }: {
                       <button
                         className="btn btn-primary btn-full"
                         disabled={!canSubmit || submittingActions}
-                        onClick={() => handleSubmitAction(actionView, actionAmount)}
+                        onClick={() => handleSubmitAction(actionView, actionView === 'dividend' ? Math.round(actionAmount * 100) : actionAmount)}
                       >
                         {actionAmount === 0
                           ? '请选择数量'
@@ -968,6 +994,8 @@ function DetailItem({ label, value, positive, hint }: {
                           ? '提交中...'
                           : actionView === 'marketing'
                           ? '确认投入'
+                          : actionView === 'dividend'
+                          ? '确认分红'
                           : '提交'}
                       </button>
                     </div>

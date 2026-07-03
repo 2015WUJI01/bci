@@ -317,7 +317,7 @@ Profit           = Revenue - TotalCost
 - 每次「裁员」= 1 个操作位 + 滑动条选择 N 人 → `Employees -= N`，成本 = `N × LaborRate × 3`（3倍季度工资补偿），可裁至0人
 - 每次「资产处置」= 1 个操作位 + 滑动条选择 N → `CapCount -= N`，获得现金 = `N × CapAssetValue × 0.75`（折价75%），制造业出售产线、矿业出售矿权
 - 每次「营销」= 1 个操作位 + 滑动条投入金额 → `Company.Cash -= 投入`，`demandBoost = round(Scale × amount^Exponent × rand(0.85, 1.15))`。制造业 Scale=5.0 Exponent=0.6，矿业 Scale=8.0 Exponent=0.6，投入越大边际效率越低，当场生效（结算时受产能封顶截断）✅ 2026-07-02 幂函数改造
-- 资本类动作（分红/回购）暂无实现
+- 资本类动作（分红/回购）—— **现金分红已实现** ✅ 2026-07-03：每股分红滑动选择（0.01元步进），实时预览总金额，总额不超过公司现金；IPO前仅向CEO分红，IPO后向所有Holdings持有人按持股比例分发
 
 **建造队列结算**（`engine/ticker.go:processBuildQueue` + `processAllBuildQueues`）:
 - **季度初**：`processAllBuildQueues(newQ)` 在季度推进后、`preGenerateQuarter` 前立即处理 `ready_quarter <= newQ` 的待完成订单，更新 `companies.cap_count`
@@ -531,6 +531,7 @@ internal/handler/
 
 **核心设计**:
 - 资金模型: `Cash(可用) / FrozenCash(冻结)`（int64 元），买单调 `FreezeCash`，成交调 `DeductFrozenCash`，撤单调 `UnfreezeCash`。冻结/解冻均检查 `RowsAffected == 0` 防止资金不足静默放行
+- **2026-07-03 修复**: `DeductHoldingQty` / `DeductHoldingQtyByPlayerStock` 缺少 `RowsAffected` 检查，`frozen_qty < fillQty` 竞态场景下持仓扣减静默失败但买方照加 → 凭空造出股份，持仓总和膨胀远超总股本。已补 `RowsAffected` 检查，扣减失败返回 `errors.New("持仓不足")` 触发事务回滚。
 - 持仓模型: `Holding.Qty / FrozenQty`，卖单调入冻结，成交扣减，Order 新增 `FrozenAmount` 追踪冻结额
 - 手续费: 买方佣金 0.025%（min ¥5），卖方佣金+印花税 0.1%
 - 撮合: 价格优先→同价时间优先(SeqNum)，限价单受阻价，市价单扫全部

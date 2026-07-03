@@ -1,6 +1,8 @@
 package store
 
 import (
+	"errors"
+
 	"gorm.io/gorm"
 
 	"jjs-server/internal/domain"
@@ -69,19 +71,33 @@ func UnfreezeHoldingQty(db *gorm.DB, holdingID uint, qty int64) error {
 }
 
 func DeductHoldingQty(db *gorm.DB, holdingID uint, qty int64) error {
-	return db.Model(&domain.Holding{}).Where("id = ? AND frozen_qty >= ?", holdingID, qty).
+	result := db.Model(&domain.Holding{}).Where("id = ? AND frozen_qty >= ?", holdingID, qty).
 		Updates(map[string]interface{}{
 			"qty":        gorm.Expr("qty - ?", qty),
 			"frozen_qty": gorm.Expr("frozen_qty - ?", qty),
-		}).Error
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("持仓不足")
+	}
+	return nil
 }
 
 func DeductHoldingQtyByPlayerStock(db *gorm.DB, playerID string, stockID uint, qty int64) error {
-	return db.Model(&domain.Holding{}).Where("player_id = ? AND stock_id = ? AND frozen_qty >= ?", playerID, stockID, qty).
+	result := db.Model(&domain.Holding{}).Where("player_id = ? AND stock_id = ? AND frozen_qty >= ?", playerID, stockID, qty).
 		Updates(map[string]interface{}{
 			"qty":        gorm.Expr("qty - ?", qty),
 			"frozen_qty": gorm.Expr("frozen_qty - ?", qty),
-		}).Error
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("持仓不足")
+	}
+	return nil
 }
 
 func GetHoldingsByStockID(stockID uint) ([]domain.Holding, error) {

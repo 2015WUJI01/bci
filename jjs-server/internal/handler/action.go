@@ -31,6 +31,14 @@ type actionResponse struct {
 	Actions   []domain.ActionLog `json:"actions"`
 }
 
+type dividendCalcInfo struct {
+	perShareFen int64             // 每股分红(分)
+	totalYuan   int64             // 总分红金额(元)
+	shares      int64             // 总分配股数
+	isPreIpo    bool              // IPO前仅向CEO分红
+	holdings    []domain.Holding  // IPO后所有持仓者
+}
+
 var validActionTypes = map[string]bool{
 	"expand":         true,
 	"hire":           true,
@@ -38,6 +46,7 @@ var validActionTypes = map[string]bool{
 	"sell_assets":    true,
 	"marketing":      true,
 	"inject_capital": true,
+	"dividend":       true,
 }
 
 const assetSellDiscount = 0.75
@@ -85,8 +94,10 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 
 	cfg := engine.Industries[c.Industry]
 
+	dividendCalcs := make([]*dividendCalcInfo, len(req.Actions))
+
 	var totalCost int64
-	for _, a := range req.Actions {
+	for i, a := range req.Actions {
 		if !validActionTypes[a.Type] {
 			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "无效的操作类型: " + a.Type})
 			return
@@ -107,6 +118,49 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "该行业暂不支持营销"})
 			return
 		}
+
+		if a.Type == "dividend" {
+			dividendPerShare := int64(a.Amount) // 分/股
+			var distShares int64
+			var isPreIpo bool
+			var holdings []domain.Holding
+			if c.IpoQuarter == 0 {
+				distShares = c.CEOShares
+				isPreIpo = true
+			} else {
+				s, err := store.GetStockByCompanyID(c.ID)
+				if err != nil {
+					WriteJSON(w, http.StatusNotFound, map[string]string{"error": "公司尚未上市"})
+					return
+				}
+				holdings, err = store.GetHoldingsByStockID(s.ID)
+				if err != nil {
+					WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "查询持仓失败"})
+					return
+				}
+				for _, h := range holdings {
+					distShares += h.Qty
+				}
+				isPreIpo = false
+			}
+			if distShares <= 0 {
+				WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "无可分配股份"})
+				return
+			}
+			totalYuan := dividendPerShare * distShares / 100
+			if totalYuan <= 0 {
+				WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "每股分红过低"})
+				return
+			}
+			dividendCalcs[i] = &dividendCalcInfo{
+				perShareFen: dividendPerShare,
+				totalYuan:   totalYuan,
+				shares:      distShares,
+				isPreIpo:    isPreIpo,
+				holdings:    holdings,
+			}
+		}
+
 		switch a.Type {
 		case "expand":
 			totalCost += int64(math.Round(float64(a.Amount) * cfg.CapBuildCost))
@@ -118,6 +172,8 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 			// asset sale gives cash, not costs it
 		case "marketing":
 			totalCost += int64(a.Amount)
+		case "dividend":
+			totalCost += dividendCalcs[i].totalYuan
 		}
 	}
 
@@ -140,7 +196,7 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 	}
 	exploreIdx := existingPendingCount
 
-	for _, a := range req.Actions {
+	for i, a := range req.Actions {
 		switch a.Type {
 		case "expand":
 			var capAmount int
@@ -246,6 +302,38 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 				Cost:   int64(-cashAmount),
 			})
 			slog.Info("capital injected", "company", c.ID, "amount", cashAmount)
+
+		case "dividend":
+			calc := dividendCalcs[i]
+			if calc == nil {
+				WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "分红计算数据丢失"})
+				return
+			}
+			if calc.isPreIpo {
+				if err := store.AddCash(store.DB, userID, calc.perShareFen*calc.shares/100); err != nil {
+					WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "CEO资金入账失败"})
+					return
+				}
+				slog.Info("dividend distributed (pre-IPO)", "company", c.ID, "perShareFen", calc.perShareFen, "shares", calc.shares, "companyTotalShares", c.TotalShares, "total", calc.totalYuan)
+			} else {
+				for _, h := range calc.holdings {
+					amount := calc.perShareFen * h.Qty / 100
+					if amount <= 0 {
+						continue
+					}
+					if err := store.AddCash(store.DB, h.PlayerID, amount); err != nil {
+						slog.Error("dividend add cash failed", "player", h.PlayerID, "error", err)
+						continue
+					}
+				}
+				slog.Info("dividend distributed (post-IPO)", "company", c.ID, "perShareFen", calc.perShareFen, "holders", len(calc.holdings), "distShares", calc.shares, "companyTotalShares", c.TotalShares, "total", calc.totalYuan)
+			}
+			actionLogs = append(actionLogs, domain.ActionLog{
+				Type:   "dividend",
+				Amount: a.Amount,
+				Actual: int(calc.shares),
+				Cost:   calc.totalYuan,
+			})
 		}
 	}
 
@@ -373,8 +461,37 @@ func (h *CompanyHandler) SubmitActions(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "该行业暂不支持操作"})
-		return
+		merged, mergeErr := engine.MergeActionLogs(existingActions, actionLogs)
+		if mergeErr != nil {
+			WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "合并操作记录失败"})
+			return
+		}
+
+		quarterly.CompanyID = c.ID
+		quarterly.Quarter = currentQ
+		quarterly.BeginningCash = c.Cash
+		quarterly.Cash = c.Cash
+		quarterly.Employees = c.Employees
+		quarterly.TotalShares = c.TotalShares
+		quarterly.CEOShares = c.CEOShares
+		quarterly.InvestorShares = c.InvestorShares
+		quarterly.PublicFloat = c.PublicFloat
+		quarterly.CapCount = c.CapCount
+		quarterly.Inventory = c.Inventory
+		quarterly.Demand = c.Demand
+		quarterly.Actions = datatypes.JSON(merged)
+
+		if quarterly.ID != 0 {
+			if err := store.DB.Save(&quarterly).Error; err != nil {
+				WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "更新季度报表失败"})
+				return
+			}
+		} else {
+			if err := store.DB.Create(&quarterly).Error; err != nil {
+				WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "创建季度报表失败"})
+				return
+			}
+		}
 	}
 
 	WriteJSON(w, http.StatusOK, actionResponse{
