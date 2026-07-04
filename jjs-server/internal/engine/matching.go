@@ -544,7 +544,7 @@ func executeSell(tx *gorm.DB, order *domain.Order, stock *domain.Stock) (*Execut
 }
 
 func CancelOrderTx(tx *gorm.DB, orderID uint, playerID string) error {
-	order, err := store.GetOrderByIDAndPlayer(orderID, playerID)
+	order, err := store.GetOrderByIDAndPlayerTx(tx, orderID, playerID)
 	if err != nil {
 		return errors.New("订单不存在")
 	}
