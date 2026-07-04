@@ -13,6 +13,7 @@ patch_*.py
 *.sh
 render.yaml
 zeabur.json
+.opencode
 # Node / Frontend
 node_modules/
 dist/
