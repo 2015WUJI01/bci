@@ -506,7 +506,8 @@ matching.go / broker.go
 | 方法 | 路径 | 认证 | 说明 |
 |------|------|------|------|
 | POST | `/api/trade/order` | JWT | 下单 |
-| DELETE | `/api/trade/order` | JWT | 撤单 |
+| DELETE | `/api/trade/order` | JWT | 撤单（旧路由，保留兼容） |
+| POST | `/api/trade/cancel` | JWT | 撤单（替代 DELETE，避免代理丢弃 body） |
 | GET | `/api/trade/orders` | JWT | 我的挂单 |
 | GET | `/api/portfolio` | JWT | 持仓 + 总资产（Cash + FrozenCash + 持仓市值） |
 

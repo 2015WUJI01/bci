@@ -569,7 +569,8 @@ internal/engine/
 | 方法 | 路径 | 说明 | 文件 |
 |------|------|------|------|
 | POST | `/api/trade/order` | 下单（limit/market, buy/sell） | handler/trade.go |
-| DELETE | `/api/trade/order` | 撤单（Body: order_id） | handler/trade.go |
+| DELETE | `/api/trade/order` | 撤单（Body: order_id，旧路由，保留兼容） | handler/trade.go |
+| POST | `/api/trade/cancel` | 撤单（Body: order_id，替代 DELETE，避免代理丢弃 body） | handler/trade.go |
 | GET | `/api/trade/orders` | 我的挂单（status=open/partial） | handler/trade.go |
 | GET | `/api/market/stocks` | 上市股票列表（基础行情）。可选 `?period=150t` 返回周期基准 OHLC/涨跌幅（基于 candles 表最新窗口） | handler/market.go |
 | GET | `/api/market/stock/{symbol}` | 单股详情（OHLCV+PE/EPS/NAV+盘口5档） | handler/market.go |
