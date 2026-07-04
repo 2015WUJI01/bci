@@ -13,11 +13,6 @@ patch_*.py
 *.sh
 render.yaml
 zeabur.json
-requirements.txt
-backend/requirements.txt
-backend/admin_trade.py
-qr_share.png
-
 # Node / Frontend
 node_modules/
 dist/

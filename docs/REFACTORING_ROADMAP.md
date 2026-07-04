@@ -1031,7 +1031,7 @@ internal/handler/
 - 单二进制部署（Go embed 前端静态文件）
 - `Dockerfile` + `docker-compose.yml`（MySQL + Go 服务）
 - 运行旧系统，对比验证关键行为一致性
-- 清理旧代码目录（归档或删除）
+- 清理旧代码目录（归档或删除）✅ 已完成 (2026-07-04) — 见 `docs/LEGACY_ARCHITECTURE.md`
 
 ---
 
@@ -1064,23 +1064,14 @@ Week 7-8:    P8 测试与收尾（含数值验证）
 
 ## 旧代码参考索引
 
-> 仅作参考，不做修改。
+> 旧代码 (`backend/`, `frontend/`) 已于 2026-07-04 删除，架构总结见 `docs/LEGACY_ARCHITECTURE.md`。
 
-| 功能域 | 文件 |
-|--------|------|
+| 功能域 | 参考文档 |
+|--------|----------|
 | 公司运营 v2 设计 | **`COMPANY_V2_DESIGN.md`** (十五章节) |
 | 数值模拟验证 | `simulate_v2.py` |
-| 全局配置/常量 | `backend/config.py` |
-| 数据模型 | `backend/models.py` |
-| DB 持久化 | `backend/database.py` |
-| 引擎核心 | `backend/game_engine.py` (3370 行) |
-| 公司引擎 (v1) | `backend/company_engine.py` |
-| 行业配置 (v1) | `backend/industry_config.py` |
-| WS 管理 | `backend/websocket_manager.py` |
-| 认证 | `backend/auth.py` |
-| API 路由 | `backend/routers/market.py`, `company.py`, `ws.py` |
-| WS 消息格式 | `backend/schemas.py` |
-| UI 布局/配色 | `frontend/index.html`, `frontend/css/style.css` |
-| 前端游戏逻辑 | `frontend/js/game.js`, `main.js` |
-| K 线绘制 | `frontend/js/kline.js` |
-| WS 客户端 | `frontend/js/websocket.js` |
+| 全局配置/常量 | `docs/LEGACY_ARCHITECTURE.md` — Legacy Backend 小节 |
+| 数据模型 | `docs/LEGACY_ARCHITECTURE.md` — Legacy Backend 小节 |
+| 引擎核心 | `docs/LEGACY_ARCHITECTURE.md` — game_engine.py (3370 行) |
+| 前端架构 | `docs/LEGACY_ARCHITECTURE.md` — Legacy Frontend 小节 |
+| 迁移决策 | `docs/LEGACY_ARCHITECTURE.md` — Migration Decisions 表 |
