@@ -76,7 +76,7 @@ export function KlineChart({ data, period, chartType, tickData }: KlineChartProp
       priceFormat: { type: 'volume' },
     }, 1)
     volumeSeries.priceScale().applyOptions({
-      scaleMargins: { top: 0.2, bottom: 0 },
+      scaleMargins: { top: 0.2, bottom: 0.03 },
     })
 
     chartRef.current = chart
