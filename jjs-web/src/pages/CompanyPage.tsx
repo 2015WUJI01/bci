@@ -1,10 +1,12 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { api } from '@/api/client'
 import { useCompanyState, usePlayerInfo, useIpoStatus } from '@/api/queries'
 import { Panel } from '@/components/Panel'
 import type { ActionResponse, LiquidationResult } from '@/types'
+
+const STORAGE_KEY_ACTION_VALUES = 'bci_last_action_values'
 
 const INDUSTRY_META: Record<string, { name: string; icon: string; desc: string; enabled: boolean }> = {
   tech:          { name: '科技',     icon: '💻', desc: '技术驱动，重研发投入，设备迭代快', enabled: false },
@@ -99,12 +101,27 @@ export function CompanyPage() {
       setInvestInitialized(true)
     }
   }, [playerInfo, investInitialized])
+  const lastActionValues = useRef<Record<string, number>>({})
   const [submittingActions, setSubmittingActions] = useState(false)
   const [actionError, setActionError] = useState('')
   const [liquidating, setLiquidating] = useState(false)
   const [liquidationResult, setLiquidationResult] = useState<LiquidationResult | null>(null)
   const [showCreateAfterLiquidation, setShowCreateAfterLiquidation] = useState(false)
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_ACTION_VALUES)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (typeof parsed === 'object' && parsed !== null) {
+          lastActionValues.current = parsed
+        }
+      }
+    } catch {
+      // ignore corrupt data
+    }
+  }, [])
 
   const playerCash = playerInfo?.cash ?? 100000
 
@@ -160,6 +177,8 @@ export function CompanyPage() {
     setActionError('')
     try {
       await api.post<ActionResponse>('/company/actions', { actions: [{ type, amount }] })
+      lastActionValues.current[type] = actionAmount
+      localStorage.setItem(STORAGE_KEY_ACTION_VALUES, JSON.stringify(lastActionValues.current))
       setActionsSubmitted(prev => prev + 1)
       setShowActions(false)
       setActionView('selection')
@@ -442,6 +461,30 @@ function DetailItem({ label, value, positive, hint }: {
             actionView === 'sell_assets' || actionView === 'layoff' || actionView === 'inject_capital'
               ? actionAmount > 0 && remaining > 0 && (actionView !== 'inject_capital' || actionAmount <= (playerInfo?.cash ?? 0))
               : actionAmount > 0 && cost <= company.cash && remaining > 0
+
+          const handleActionSelect = (view: string) => {
+            setActionView(view as any)
+            setActionError('')
+            let max = 0
+            if (view === 'expand') {
+              max = Math.floor(company.cash / expUnitCost)
+            } else if (view === 'hire') {
+              max = Math.floor(company.cash / hireUnitCost)
+            } else if (view === 'layoff') {
+              max = company.employees
+            } else if (view === 'sell_assets') {
+              max = company.cap_count
+            } else if (view === 'inject_capital') {
+              max = playerInfo?.cash ?? 0
+            } else if (view === 'dividend') {
+              const distShares = company.ipo_quarter > 0 ? company.total_shares : company.ceo_shares
+              max = Math.floor(company.cash / distShares * 100) / 100
+            } else {
+              max = Math.floor(company.cash)
+            }
+            const last = lastActionValues.current[view]
+            setActionAmount(last !== undefined ? Math.min(last, max) : 0)
+          }
 
           return (
         <div className="space-y-3">
@@ -755,7 +798,7 @@ function DetailItem({ label, value, positive, hint }: {
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
-                        onClick={() => { setActionView('expand'); setActionAmount(0); setActionError('') }}
+                        onClick={() => handleActionSelect('expand')}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">🏭</span>
@@ -768,7 +811,7 @@ function DetailItem({ label, value, positive, hint }: {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
-                        onClick={() => { setActionView('hire'); setActionAmount(0); setActionError('') }}
+                        onClick={() => handleActionSelect('hire')}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">👥</span>
@@ -781,7 +824,7 @@ function DetailItem({ label, value, positive, hint }: {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-red hover:bg-accent-red/5 transition-colors"
-                        onClick={() => { setActionView('layoff'); setActionAmount(0); setActionError('') }}
+                        onClick={() => handleActionSelect('layoff')}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">📉</span>
@@ -794,7 +837,7 @@ function DetailItem({ label, value, positive, hint }: {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
-                        onClick={() => { setActionView('sell_assets'); setActionAmount(0); setActionError('') }}
+                        onClick={() => handleActionSelect('sell_assets')}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">🏷️</span>
@@ -809,7 +852,7 @@ function DetailItem({ label, value, positive, hint }: {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-gold hover:bg-accent-gold/5 transition-colors"
-                        onClick={() => { setActionView('marketing'); setActionAmount(0); setActionError('') }}
+                        onClick={() => handleActionSelect('marketing')}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">📢</span>
@@ -822,7 +865,7 @@ function DetailItem({ label, value, positive, hint }: {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-up hover:bg-up/5 transition-colors"
-                        onClick={() => { setActionView('dividend'); setActionAmount(0); setActionError('') }}
+                        onClick={() => handleActionSelect('dividend')}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">💵</span>
@@ -835,7 +878,7 @@ function DetailItem({ label, value, positive, hint }: {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-gold hover:bg-accent-gold/5 transition-colors col-span-2 md:col-span-3 lg:col-span-2"
-                        onClick={() => { setActionView('inject_capital'); setActionAmount(0); setActionError('') }}
+                        onClick={() => handleActionSelect('inject_capital')}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">💰</span>
@@ -856,7 +899,7 @@ function DetailItem({ label, value, positive, hint }: {
                     <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
                       <button
                         className="text-text-muted hover:text-text-primary transition-colors text-sm"
-                        onClick={() => { setActionView('selection'); setActionAmount(0); setActionError('') }}
+                        onClick={() => { setActionView('selection'); setActionError('') }}
                       >
                         ← 返回
                       </button>
