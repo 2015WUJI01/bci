@@ -736,7 +736,7 @@ function DetailItem({ label, value, positive, hint }: {
               onClick={() => { setShowActions(false); setActionView('selection') }}
             >
               <div
-                className="bg-bg-card border border-border rounded-lg shadow-xl w-full max-w-sm mx-4 overflow-hidden"
+                className="bg-bg-card border border-border rounded-lg shadow-xl w-full max-w-sm md:max-w-lg lg:max-w-xl mx-4 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 {actionView === 'selection' ? (
@@ -752,55 +752,55 @@ function DetailItem({ label, value, positive, hint }: {
                         ✕
                       </button>
                     </div>
-                    <div className="p-4 space-y-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
                       <button
-                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
+                        className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
                         onClick={() => { setActionView('expand'); setActionAmount(0); setActionError('') }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">🏭</span>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-base">🏭</span>
                           <span className="text-sm font-semibold text-text-primary">{isMfg ? '新建产线' : '勘探矿脉'}</span>
                         </div>
-                        <div className="text-xs text-text-muted">
+                        <div className="text-[11px] text-text-muted">
                           ¥{expUnitCost.toLocaleString()}/{isMfg ? '条' : '次'} · {isMfg ? '1季后投产' : '2季后完工 · 储量随机'}
                         </div>
                       </button>
 
                       <button
-                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
+                        className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
                         onClick={() => { setActionView('hire'); setActionAmount(0); setActionError('') }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">👥</span>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-base">👥</span>
                           <span className="text-sm font-semibold text-text-primary">招募员工</span>
                         </div>
-                        <div className="text-xs text-text-muted">
+                        <div className="text-[11px] text-text-muted">
                           ¥{hireUnitCost.toLocaleString()}/岗 · 预计实招 30%~100%
                         </div>
                       </button>
 
                       <button
-                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-red hover:bg-accent-red/5 transition-colors"
+                        className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-red hover:bg-accent-red/5 transition-colors"
                         onClick={() => { setActionView('layoff'); setActionAmount(0); setActionError('') }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">📉</span>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-base">📉</span>
                           <span className="text-sm font-semibold text-text-primary">裁员</span>
                         </div>
-                        <div className="text-xs text-text-muted">
+                        <div className="text-[11px] text-text-muted">
                           ¥{layoffUnitCost.toLocaleString()}/人 · 补偿 3 倍季度工资
                         </div>
                       </button>
 
                       <button
-                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
+                        className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
                         onClick={() => { setActionView('sell_assets'); setActionAmount(0); setActionError('') }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">🏷️</span>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-base">🏷️</span>
                           <span className="text-sm font-semibold text-text-primary">资产处置</span>
                         </div>
-                        <div className="text-xs text-text-muted">
+                        <div className="text-[11px] text-text-muted">
                           {isMfg
                             ? `¥${Math.round(80000 * 0.75).toLocaleString()}/条 · 折价 75%`
                             : `¥${(2.0 * 0.75).toFixed(1)}/单位 · 折价 75%`}
@@ -808,40 +808,40 @@ function DetailItem({ label, value, positive, hint }: {
                       </button>
 
                       <button
-                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-gold hover:bg-accent-gold/5 transition-colors"
+                        className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-gold hover:bg-accent-gold/5 transition-colors"
                         onClick={() => { setActionView('marketing'); setActionAmount(0); setActionError('') }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">📢</span>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-base">📢</span>
                           <span className="text-sm font-semibold text-text-primary">营销推广</span>
                         </div>
-                        <div className="text-xs text-text-muted">
+                        <div className="text-[11px] text-text-muted">
                           投入资金提升当季需求
                         </div>
-                       </button>
+                        </button>
 
                       <button
-                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-up hover:bg-up/5 transition-colors"
+                        className="text-left p-3 rounded border border-border bg-bg-input hover:border-up hover:bg-up/5 transition-colors"
                         onClick={() => { setActionView('dividend'); setActionAmount(0); setActionError('') }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">💵</span>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-base">💵</span>
                           <span className="text-sm font-semibold text-text-primary">现金分红</span>
                         </div>
-                        <div className="text-xs text-text-muted">
+                        <div className="text-[11px] text-text-muted">
                           {company.ipo_quarter > 0 ? '向所有股东分红 · 按持股比例' : '向CEO分红'}
                         </div>
                       </button>
 
                       <button
-                        className="w-full text-left p-4 rounded border border-border bg-bg-input hover:border-accent-gold hover:bg-accent-gold/5 transition-colors"
+                        className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-gold hover:bg-accent-gold/5 transition-colors col-span-2 md:col-span-3 lg:col-span-2"
                         onClick={() => { setActionView('inject_capital'); setActionAmount(0); setActionError('') }}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">💰</span>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-base">💰</span>
                           <span className="text-sm font-semibold text-text-primary">个人注资</span>
                         </div>
-                        <div className="text-xs text-text-muted">
+                        <div className="text-[11px] text-text-muted">
                           从个人现金转入公司 · 不改变股权
                         </div>
                       </button>
