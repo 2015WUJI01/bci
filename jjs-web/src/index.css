@@ -73,7 +73,6 @@
   input[type="email"],
   input[type="password"],
   input[type="text"],
-  input[type="number"],
   select {
     @apply w-full px-3.5 py-2.5 bg-bg-input border border-border rounded-sm text-text-primary text-[15px] outline-none;
   }
