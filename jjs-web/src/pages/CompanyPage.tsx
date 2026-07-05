@@ -892,7 +892,7 @@ function DetailItem({ label, value, positive, hint }: {
                               min={0}
                               max={maxAmount}
                               step={actionView === 'dividend' ? 0.01 : 1}
-                              value={actionView === 'dividend' ? actionAmount.toFixed(2) : actionAmount}
+                              value={actionView === 'dividend' ? actionAmount.toFixed(2) : actionAmount || ''}
                               onChange={(e) => {
                                 const v = e.target.value === '' ? 0 : Number(e.target.value)
                                 if (actionView === 'dividend') setActionAmount(Math.round(v * 100) / 100)

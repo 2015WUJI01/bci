@@ -91,6 +91,27 @@
 
 **做法**：输入框右侧 padding 从 `px-2`（8px）加大到 `pl-2 pr-9`（36px），为右侧浮动单位标签留出安全空间。
 
+### 默认 0 无法删除
+
+数字输入框初始值为 0，用户无法删除。输入 "123" 时显示 "0123"：
+
+```
+┌────────┐  用户按 Backspace → ┌────────┐
+│   0    │                     │        │  ← 立即弹回 "0"
+└────────┘                     └────────┘
+     ↓ 用户输入 123
+┌────────┐
+│ 0123   │  ← 显示怪，虽然数值 123 是对的
+└────────┘
+```
+
+**做法**：输入框 `value` 改为 `actionAmount || ''`。当 actionAmount=0 时显示空字符串，用户可直接输入。
+
+**影响范围分析**：
+- `CompanyPage.tsx:895` — 唯一受影响处。`value={actionAmount}` → `value={actionAmount || ''}`
+- `TradeForm.tsx` 的两个 `<input type="number">` — 使用 `useState('')` 初始为空，无此问题
+- `actionAmount` state 类型不变（仍是 number），所有 `actionAmount` 的派生计算不受影响
+
 ## 改动位置
 
 改一个文件：
@@ -99,11 +120,13 @@
 |------|------|------|
 | `jjs-web/src/pages/CompanyPage.tsx` | ~869-889 | 替换滑块区域为 `slider + input[type=number]` 组合 |
 | `jjs-web/src/pages/CompanyPage.tsx` | ~905 | 输入框 `px-2` → `pl-2 pr-9`，避免与单位标签重叠 |
+| `jjs-web/src/pages/CompanyPage.tsx` | ~895 | 输入框 `value={actionAmount}` → `value={actionAmount \|\| ''}`，解决默认 0 无法删除问题 |
 
 ## 不变部分
 
-- `actionAmount` state 的类型和初始值不变
+- `actionAmount` state 的类型和初始值不变（仍是 `useState(0)`）
 - `maxAmount`、`cost` 的计算逻辑不变
 - 提交按钮的 `canSubmit` 逻辑不变
 - 底部成本/收入显示不变
 - 各项行动类型的详情描述文字不变
+- `TradeForm.tsx` 的两个输入框不受影响（已用字符串状态）
