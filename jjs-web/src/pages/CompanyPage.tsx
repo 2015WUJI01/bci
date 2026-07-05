@@ -902,7 +902,7 @@ function DetailItem({ label, value, positive, hint }: {
                                 if (actionAmount < 0) setActionAmount(0)
                                 else if (actionAmount > maxAmount) setActionAmount(maxAmount)
                               }}
-                              className="w-full px-2 py-1.5 text-xs text-right bg-bg-input border border-border rounded focus:outline-none focus:border-accent-blue [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="w-full pl-2 pr-9 py-1.5 text-xs text-right bg-bg-input border border-border rounded focus:outline-none focus:border-accent-blue [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-text-muted pointer-events-none">
                               {actionConfig[actionView]?.unit}
