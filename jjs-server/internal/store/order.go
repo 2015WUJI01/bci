@@ -18,12 +18,16 @@ func GetOrderByID(orderID uint) (*domain.Order, error) {
 	return &o, nil
 }
 
-func GetOrderByIDAndPlayer(orderID uint, playerID string) (*domain.Order, error) {
+func GetOrderByIDAndPlayerTx(db *gorm.DB, orderID uint, playerID string) (*domain.Order, error) {
 	var o domain.Order
-	if err := DB.Where("id = ? AND player_id = ?", orderID, playerID).First(&o).Error; err != nil {
+	if err := db.Where("id = ? AND player_id = ?", orderID, playerID).First(&o).Error; err != nil {
 		return nil, err
 	}
 	return &o, nil
+}
+
+func GetOrderByIDAndPlayer(orderID uint, playerID string) (*domain.Order, error) {
+	return GetOrderByIDAndPlayerTx(DB, orderID, playerID)
 }
 
 func SaveOrder(order *domain.Order) error {
