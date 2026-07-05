@@ -871,22 +871,44 @@ function DetailItem({ label, value, positive, hint }: {
                           <span>
                             {actionConfig[actionView]?.inputLabel}
                           </span>
-                          <span className="text-text-primary font-semibold">
-                            {actionView === 'dividend'
-                              ? actionAmount.toFixed(2)
-                              : actionAmount.toLocaleString()}{' '}
-                            {actionConfig[actionView]?.unit}
-                          </span>
                         </div>
-                        <input
-                          type="range"
-                          min={0}
-                          max={maxAmount}
-                          step={actionView === 'dividend' ? 0.01 : 1}
-                          value={actionAmount}
-                          onChange={(e) => setActionAmount(Number(e.target.value))}
-                          className="w-full accent-accent-blue"
-                        />
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="range"
+                            min={0}
+                            max={maxAmount}
+                            step={actionView === 'dividend' ? 0.01 : 1}
+                            value={actionAmount}
+                            onChange={(e) => {
+                              const v = Number(e.target.value)
+                              if (actionView === 'dividend') setActionAmount(Math.round(v * 100) / 100)
+                              else setActionAmount(v)
+                            }}
+                            className="flex-1 accent-accent-blue"
+                          />
+                          <div className="relative shrink-0 w-28">
+                            <input
+                              type="number"
+                              min={0}
+                              max={maxAmount}
+                              step={actionView === 'dividend' ? 0.01 : 1}
+                              value={actionView === 'dividend' ? actionAmount.toFixed(2) : actionAmount || ''}
+                              onChange={(e) => {
+                                const v = e.target.value === '' ? 0 : Number(e.target.value)
+                                if (actionView === 'dividend') setActionAmount(Math.round(v * 100) / 100)
+                                else setActionAmount(v)
+                              }}
+                              onBlur={() => {
+                                if (actionAmount < 0) setActionAmount(0)
+                                else if (actionAmount > maxAmount) setActionAmount(maxAmount)
+                              }}
+                              className="w-full pl-2 pr-9 py-1.5 text-xs text-right bg-bg-input border border-border rounded focus:outline-none focus:border-accent-blue [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-text-muted pointer-events-none">
+                              {actionConfig[actionView]?.unit}
+                            </span>
+                          </div>
+                        </div>
                         <div className="flex justify-between text-[11px] text-text-muted mt-0.5">
                           {actionView === 'expand' ? (
                             <>
