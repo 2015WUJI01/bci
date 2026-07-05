@@ -9,6 +9,10 @@
     box-sizing: border-box;
   }
 
+  html {
+    touch-action: manipulation;
+  }
+
   body {
     @apply font-sans;
   }
