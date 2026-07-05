@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { useGameStore } from '@/stores/gameStore'
 import { Panel } from '@/components/Panel'
+import { useToast } from '@/components/Toast'
 import { portfolioKeys } from '@/api/queries'
 
 interface BackendHolding {
@@ -65,6 +67,8 @@ export function PortfolioPage() {
   const wsStocks = useGameStore((s) => s.stocks)
   const wsCash = useGameStore((s) => s.cash)
   const wsFrozenCash = useGameStore((s) => s.frozenCash)
+  const toast = useToast()
+  const [cancellingIds, setCancellingIds] = useState<Set<number>>(new Set())
 
   const { data: portfolio } = useQuery<PortfolioResponse>({
     queryKey: portfolioKeys.all,
@@ -99,12 +103,19 @@ export function PortfolioPage() {
   const totalValue = cash + frozenCash + totalMarketValue / 100
 
   const handleCancel = async (orderId: number) => {
+    setCancellingIds((prev) => new Set(prev).add(orderId))
     try {
-      await api.delete('/trade/order', { order_id: orderId })
+      await api.post('/trade/cancel', { order_id: orderId })
       queryClient.invalidateQueries({ queryKey: portfolioKeys.orders })
       queryClient.invalidateQueries({ queryKey: portfolioKeys.all })
-    } catch {
-      // error is handled by api client
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '撤单失败')
+    } finally {
+      setCancellingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(orderId)
+        return next
+      })
     }
   }
 
@@ -253,13 +264,14 @@ export function PortfolioPage() {
                     <td className="text-center py-1.5 px-2">
                       {(o.status === 'open' || o.status === 'partial') && (
                         <button
-                          className="text-[10px] text-accent-red hover:underline"
+                          className="text-[10px] text-accent-red hover:underline disabled:text-text-muted disabled:no-underline"
+                          disabled={cancellingIds.has(o.id)}
                           onClick={(e) => {
                             e.stopPropagation()
                             handleCancel(o.id)
                           }}
                         >
-                          撤单
+                          {cancellingIds.has(o.id) ? '撤单中...' : '撤单'}
                         </button>
                       )}
                     </td>

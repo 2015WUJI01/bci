@@ -43,6 +43,7 @@ func New(authH *handler.AuthHandler, playerH *handler.PlayerHandler, companyH *h
 		r.Get("/market/orderbook/{symbol}", marketH.GetOrderBook)
 
 		r.With(middleware.JWT).Post("/trade/order", tradeH.PlaceOrder)
+		r.With(middleware.JWT).Post("/trade/cancel", tradeH.CancelOrder)
 		r.With(middleware.JWT).Delete("/trade/order", tradeH.CancelOrder)
 		r.With(middleware.JWT).Get("/trade/orders", tradeH.MyOrders)
 		r.With(middleware.JWT).Get("/portfolio", tradeH.Portfolio)
