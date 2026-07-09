@@ -8,21 +8,31 @@ import (
 	"jjs-server/internal/store"
 )
 
-func WalkProsperity(oldProsperity float64, cfg IndustryConfig) float64 {
-	halfRange := (cfg.ProsperityMax - cfg.ProsperityMin) / 2
-	deviation := (oldProsperity - 1.0) / halfRange // [-1, +1]
+// calcDeviation 将偏离 1.0 的程度归一化到 [-1, +1]。
+// 由于边界非对称 (max = 1/min)，上方和下方分别用不同的分母归一化。
+func calcDeviation(p, min, max float64) float64 {
+	if p >= 1.0 {
+		return (p - 1.0) / (max - 1.0) // [0, +1]
+	}
+	return (p - 1.0) / (1.0 - min) // [-1, 0)
+}
 
-	// 修正脉冲：覆盖当季正常步长
+func WalkProsperity(oldProsperity float64, cfg IndustryConfig) float64 {
+	// 正态分布随机步长：大部分小波动，偶尔大波动
+	rawStep := rand.NormFloat64() * cfg.ProsperityStdDev
+
+	// 向心回归（非对称归一化）
+	dev := calcDeviation(oldProsperity, cfg.ProsperityMin, cfg.ProsperityMax)
+	regressionStep := -dev * cfg.ProsperityRegression
+
+	// 修正脉冲：小概率，极端偏离时向中心猛拉
 	if rand.Float64() < cfg.CorrectionProb {
-		pulse := -deviation * cfg.CorrectionPulse
+		pulse := -dev * cfg.CorrectionPulse
 		return clamp(oldProsperity+pulse, cfg.ProsperityMin, cfg.ProsperityMax)
 	}
 
-	// 正常季度：随机 + 回归
-	randomStep := (rand.Float64()*2 - 1) * cfg.ProsperityMaxStep
-	regressionStep := -deviation * cfg.ProsperityRegression
-
-	change := clamp(randomStep+regressionStep, -cfg.ProsperityMaxStep, cfg.ProsperityMaxStep)
+	// 步长 = 随机 + 回归，clamp 到单季硬上限
+	change := clamp(rawStep+regressionStep, -cfg.ProsperityMaxStep, cfg.ProsperityMaxStep)
 
 	return clamp(oldProsperity+change, cfg.ProsperityMin, cfg.ProsperityMax)
 }
