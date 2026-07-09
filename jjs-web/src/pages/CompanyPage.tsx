@@ -403,16 +403,14 @@ function DetailItem({ label, value, positive, hint }: {
 }
 
 /*
-  formatProsperityChange 将景气度变化转为显示字符串。
+  formatProsperityDeviation 将景气值转为相对于基准 1.0 的偏离百分比。
 
-  保留2位小数但省略末尾0（如3.50% → 3.5%），
-  因为对玩家来说 3.5% 和 3.50% 含义相同，更简洁。
-  使用正则去除末尾多余的0和小数点——如果去掉后只剩下符号和数字，就保留原格式。
+  景气度本身就是百分比含义的数字：1.0 = 正常水平，
+  0.91 表示低于基准 9%，1.2345 表示高于基准 23.45%。
+  保留2位小数但省略末尾0（如 23.40% → 23.4%）。
 */
-function formatProsperityChange(current: number, prev: number): string {
-  if (prev <= 0) return '—'
-  const raw = ((current - prev) / prev) * 100
-  // 保留2位小数，再去掉末尾的0（但至少保留1位小数）
+function formatProsperityDeviation(prosperity: number): string {
+  const raw = (prosperity - 1.0) * 100
   const fixed = raw.toFixed(2)
   const trimmed = fixed.replace(/\.?0+$/, '')
   const sign = raw > 0 ? '+' : ''
@@ -562,17 +560,20 @@ function formatProsperityChange(current: number, prev: number): string {
                   value={company.inventory > 0 ? `${company.inventory.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}` : '—'}
                   hint={confirmedQ ? `上季产量 ${confirmedQ.prod_qty.toLocaleString()} - 销量 ${confirmedQ.sales_qty.toLocaleString()} = 库存${invDelta >= 0 ? '+' : ''}${invDelta.toLocaleString()}` : undefined}
                 />
-                {/* 第6项：景气度变化百分比，解释销量/价格为何浮动 */}
+                {/* 第6项：需求量 = 上季实际销量 + 景气度偏离，红涨绿跌与A股一致 */}
                 <MetricCard
-                  label="景气度"
-                  value={formatProsperityChange(company.prosperity, company.prev_prosperity)}
-                  hint={company.prev_prosperity > 0 ? `上期 ${company.prev_prosperity.toFixed(4)} → 本期 ${company.prosperity.toFixed(4)}` : undefined}
+                  label="需求量"
+                  value={
+                    confirmedQ
+                      ? `${confirmedQ.sales_qty.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}/季（${formatProsperityDeviation(company.prosperity)}）`
+                      : formatProsperityDeviation(company.prosperity)
+                  }
                   colorClass={
-                    company.prev_prosperity > 0
-                      ? company.prosperity >= company.prev_prosperity
+                    company.prosperity > 1.0
+                      ? 'text-accent-red'
+                      : company.prosperity < 1.0
                         ? 'text-accent-green'
-                        : 'text-accent-red'
-                      : undefined
+                        : undefined
                   }
                 />
               </div>
