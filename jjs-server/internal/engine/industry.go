@@ -25,7 +25,8 @@ type IndustryConfig struct {
 	// 景气度游走参数 (中心=1.0)
 	ProsperityMin        float64
 	ProsperityMax        float64
-	ProsperityMaxStep    float64
+	ProsperityStdDev     float64 // 正态分布标准差 (大部分小波动, 偶尔大波动)
+	ProsperityMaxStep    float64 // 单季变化硬上限 (安全网)
 	ProsperityRegression float64 // 边界向心回拉的绝对步长
 
 	// 景气度修正脉冲
@@ -72,7 +73,8 @@ var Industries = map[string]IndustryConfig{
 		MarketingScale:    0,
 		MarketingExponent: 0,
 		ProsperityMin:        0.85,
-		ProsperityMax:        1.15,
+		ProsperityMax:        1.1764705882352942,
+		ProsperityStdDev:     0.025,
 		ProsperityMaxStep:    0.05,
 		ProsperityRegression: 0.03,
 		CorrectionProb:       0.05,
@@ -101,7 +103,8 @@ var Industries = map[string]IndustryConfig{
 		MarketingScale:    0,
 		MarketingExponent: 0,
 		ProsperityMin:        0.90,
-		ProsperityMax:        1.10,
+		ProsperityMax:        1.1111111111111112,
+		ProsperityStdDev:     0.020,
 		ProsperityMaxStep:    0.04,
 		ProsperityRegression: 0.02,
 		CorrectionProb:       0.04,
@@ -130,7 +133,8 @@ var Industries = map[string]IndustryConfig{
 		MarketingScale:    5.0,
 		MarketingExponent: 0.6,
 		ProsperityMin:        0.90,
-		ProsperityMax:        1.10,
+		ProsperityMax:        1.1111111111111112,
+		ProsperityStdDev:     0.020,
 		ProsperityMaxStep:    0.04,
 		ProsperityRegression: 0.02,
 		CorrectionProb:       0.04,
@@ -159,7 +163,8 @@ var Industries = map[string]IndustryConfig{
 		MarketingScale:    8.0,
 		MarketingExponent: 0.6,
 		ProsperityMin:        0.85,
-		ProsperityMax:        1.15,
+		ProsperityMax:        1.1764705882352942,
+		ProsperityStdDev:     0.025,
 		ProsperityMaxStep:    0.05,
 		ProsperityRegression: 0.03,
 		CorrectionProb:       0.05,
@@ -188,7 +193,8 @@ var Industries = map[string]IndustryConfig{
 		MarketingScale:    0,
 		MarketingExponent: 0,
 		ProsperityMin:        0.94,
-		ProsperityMax:        1.06,
+		ProsperityMax:        1.0638297872340425,
+		ProsperityStdDev:     0.015,
 		ProsperityMaxStep:    0.03,
 		ProsperityRegression: 0.01,
 		CorrectionProb:       0.03,
@@ -217,7 +223,8 @@ var Industries = map[string]IndustryConfig{
 		MarketingScale:    0,
 		MarketingExponent: 0,
 		ProsperityMin:        0.94,
-		ProsperityMax:        1.06,
+		ProsperityMax:        1.0638297872340425,
+		ProsperityStdDev:     0.015,
 		ProsperityMaxStep:    0.03,
 		ProsperityRegression: 0.01,
 		CorrectionProb:       0.03,
