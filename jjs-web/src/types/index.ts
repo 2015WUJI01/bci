@@ -209,6 +209,9 @@ export interface CompanyState {
   stock_price: number
   can_liquidate: boolean
 
+  // 当前需求量（含营销加成）
+  demand: number
+
   // 景气值：用于经营指标展示季度变化百分比，解释销量/价格波动
   prosperity: number
   prev_prosperity: number

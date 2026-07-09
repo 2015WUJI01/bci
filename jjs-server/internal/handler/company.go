@@ -69,7 +69,10 @@ type companyStateResponse struct {
 	StockPrice       int64                    `json:"stock_price"`
 	CanLiquidate     bool                     `json:"can_liquidate"`
 
-	// 景气值暴露给前端，解释销量/价格波动原因
+	// 当前需求量（含营销加成）
+	Demand int64 `json:"demand"`
+
+	// 景气值，解释销量/价格波动原因
 	Prosperity     float64 `json:"prosperity"`
 	PrevProsperity float64 `json:"prev_prosperity"`
 }
@@ -503,6 +506,7 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		ActionsSubmitted: actionsSubmitted,
 		StockPrice:       stockPrice,
 		CanLiquidate:     engine.CanLiquidate(company.ID, currentQ),
+		Demand:           company.Demand,
 		Prosperity:       pros,
 		PrevProsperity:   prevPros,
 	})

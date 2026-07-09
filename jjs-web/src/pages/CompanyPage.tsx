@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { api } from '@/api/client'
@@ -560,21 +560,19 @@ function formatProsperityDeviation(prosperity: number): string {
                   value={company.inventory > 0 ? `${company.inventory.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}` : '—'}
                   hint={confirmedQ ? `上季产量 ${confirmedQ.prod_qty.toLocaleString()} - 销量 ${confirmedQ.sales_qty.toLocaleString()} = 库存${invDelta >= 0 ? '+' : ''}${invDelta.toLocaleString()}` : undefined}
                 />
-                {/* 第6项：需求量 = 上季实际销量 + 景气度偏离，红涨绿跌与A股一致 */}
+                {/* 第6项：需求量 = 当前需求 + 景气偏离，景气偏离红涨绿跌 */}
                 <MetricCard
                   label="需求量"
                   value={
-                    confirmedQ
-                      ? `${confirmedQ.sales_qty.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}/季（${formatProsperityDeviation(company.prosperity)}）`
-                      : formatProsperityDeviation(company.prosperity)
+                    (() => {
+                      const prosperityColor = company.prosperity > 1.0 ? 'text-accent-red' : company.prosperity < 1.0 ? 'text-accent-green' : ''
+                      if (confirmedQ) {
+                        return <>{company.demand.toLocaleString()}{outputUnit}/季（<span className={prosperityColor}>{formatProsperityDeviation(company.prosperity)}</span>）</>
+                      }
+                      return <span className={prosperityColor}>{formatProsperityDeviation(company.prosperity)}</span>
+                    })()
                   }
-                  colorClass={
-                    company.prosperity > 1.0
-                      ? 'text-accent-red'
-                      : company.prosperity < 1.0
-                        ? 'text-accent-green'
-                        : undefined
-                  }
+                  hint={confirmedQ ? `上季需求量 ${confirmedQ.demand.toLocaleString()}${outputUnit}/季` : undefined}
                 />
               </div>
           {company.can_liquidate && (
@@ -1667,7 +1665,7 @@ EPS（每股收益）= 近4季平均净利润 / 总股本
   )
 }
 
-function MetricCard({ label, value, hint, className, colorClass }: { label: string; value: string; hint?: string; className?: string; colorClass?: string }) {
+function MetricCard({ label, value, hint, className, colorClass }: { label: string; value: React.ReactNode; hint?: string; className?: string; colorClass?: string }) {
   return (
     <div className={`bg-bg-card rounded p-2.5 border border-border relative group ${className ?? ''}`}>
       <div className="text-[11px] text-text-muted">{label}</div>
