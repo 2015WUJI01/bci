@@ -208,6 +208,10 @@ export interface CompanyState {
   actions_submitted: number
   stock_price: number
   can_liquidate: boolean
+
+  // 景气值：用于经营指标展示季度变化百分比，解释销量/价格波动
+  prosperity: number
+  prev_prosperity: number
 }
 
 export type Industry = 'tech' | 'finance' | 'manufacturing' | 'mining' | 'consumer' | 'healthcare'
