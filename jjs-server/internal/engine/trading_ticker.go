@@ -99,31 +99,47 @@ func (t *TradingTicker) broadcastPriceUpdate(stocks []domain.Stock, candlesBySto
 	t.hub.Broadcast(msg)
 }
 
+// aggregateAllCandles 收集所有活跃股票 × 3 个周期（15t/60t/150t）的当前价格，
+// 通过 BulkUpsertCandles 一次批量 upsert 全部 candle 数据，替代原有的逐股票逐周期
+// UpsertCandle 循环调用。将 N×3×2 次 DB 往返压缩为 2 次（1 upsert + 1 select）。
+//
+// 返回 stockID → period → Candle 的二级 map，供 WebSocket PriceUpdate 广播使用。
 func (t *TradingTicker) aggregateAllCandles(stocks []domain.Stock) map[uint]map[string]domain.Candle {
-	candlesByStock := make(map[uint]map[string]domain.Candle, len(stocks))
+	periods := []struct {
+		name    string
+		seconds int64
+	}{
+		{"15t", 30},
+		{"60t", 120},
+		{"150t", 300},
+	}
 
+	now := time.Now()
+	openTimes := make([]time.Time, len(periods))
+	for i, p := range periods {
+		openTimes[i] = candleOpenTime(now, p.seconds)
+	}
+
+	// 收集全部 stock×period 组合，一次调用批量写入
+	ticks := make([]store.CandleTick, 0, len(stocks)*len(periods))
 	for _, s := range stocks {
 		if s.CurrentPrice <= 0 {
 			continue
 		}
-		periodCandles := make(map[string]domain.Candle, 3)
-		for _, period := range []struct {
-			name    string
-			seconds int64
-		}{
-			{"15t", 30},
-			{"60t", 120},
-			{"150t", 300},
-		} {
-			openTime := candleOpenTime(time.Now(), period.seconds)
-			candle, err := store.UpsertCandle(s.ID, period.name, openTime, s.CurrentPrice, 0)
-			if err != nil {
-				slog.Error("candle upsert failed", "stockID", s.ID, "period", period.name, "error", err)
-				continue
-			}
-			periodCandles[period.name] = candle
+		for i, p := range periods {
+			ticks = append(ticks, store.CandleTick{
+				StockID:  s.ID,
+				Period:   p.name,
+				OpenTime: openTimes[i],
+				Price:    s.CurrentPrice,
+			})
 		}
-		candlesByStock[s.ID] = periodCandles
+	}
+
+	candlesByStock, err := store.BulkUpsertCandles(ticks)
+	if err != nil {
+		slog.Error("bulk candle upsert failed", "error", err)
+		return make(map[uint]map[string]domain.Candle)
 	}
 	return candlesByStock
 }
