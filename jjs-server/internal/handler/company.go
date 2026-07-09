@@ -68,6 +68,10 @@ type companyStateResponse struct {
 	ActionsSubmitted int                      `json:"actions_submitted"`
 	StockPrice       int64                    `json:"stock_price"`
 	CanLiquidate     bool                     `json:"can_liquidate"`
+
+	// 景气值暴露给前端，解释销量/价格波动原因
+	Prosperity     float64 `json:"prosperity"`
+	PrevProsperity float64 `json:"prev_prosperity"`
 }
 
 var industryPrefix = map[string]string{
@@ -462,6 +466,16 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 查景气值：LatestProsperity 取当期，ProsperityHistory(limit=2) 取上期
+	pros, _ := store.LatestProsperity(company.Industry)
+	var prevPros float64
+	if hist, err := store.ProsperityHistory(company.Industry, 2); err == nil && len(hist) > 1 {
+		prevPros = hist[1].Prosperity
+	} else {
+		// 只有一条记录时上期传 0，前端按无数据显示 —
+		prevPros = 0
+	}
+
 	WriteJSON(w, http.StatusOK, companyStateResponse{
 		ID:               company.ID,
 		Symbol:           company.Symbol,
@@ -489,5 +503,7 @@ func (h *CompanyHandler) State(w http.ResponseWriter, r *http.Request) {
 		ActionsSubmitted: actionsSubmitted,
 		StockPrice:       stockPrice,
 		CanLiquidate:     engine.CanLiquidate(company.ID, currentQ),
+		Prosperity:       pros,
+		PrevProsperity:   prevPros,
 	})
 }

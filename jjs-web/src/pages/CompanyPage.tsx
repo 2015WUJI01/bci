@@ -380,8 +380,26 @@ function DetailItem({ label, value, positive, hint }: {
                 </div>
               </Panel>
             </div>
-          )
-        }
+  )
+}
+
+/*
+  formatProsperityChange 将景气度变化转为显示字符串。
+
+  保留2位小数但省略末尾0（如3.50% → 3.5%），
+  因为对玩家来说 3.5% 和 3.50% 含义相同，更简洁。
+  使用正则去除末尾多余的0和小数点——如果去掉后只剩下符号和数字，就保留原格式。
+*/
+function formatProsperityChange(current: number, prev: number): string {
+  if (prev <= 0) return '—'
+  const raw = ((current - prev) / prev) * 100
+  // 保留2位小数，再去掉末尾的0（但至少保留1位小数）
+  const fixed = raw.toFixed(2)
+  const trimmed = fixed.replace(/\.?0+$/, '')
+  const sign = raw > 0 ? '+' : ''
+  return `${sign}${trimmed}%`
+}
+
 
           const confirmedQ = company.last_quarterly
           const invDelta = confirmedQ ? confirmedQ.prod_qty - confirmedQ.sales_qty : 0
@@ -500,6 +518,19 @@ function DetailItem({ label, value, positive, hint }: {
                   label="库存"
                   value={company.inventory > 0 ? `${company.inventory.toLocaleString()}${company.industry === 'mining' ? '单位' : '件'}` : '—'}
                   hint={confirmedQ ? `上季产量 ${confirmedQ.prod_qty.toLocaleString()} - 销量 ${confirmedQ.sales_qty.toLocaleString()} = 库存${invDelta >= 0 ? '+' : ''}${invDelta.toLocaleString()}` : undefined}
+                />
+                {/* 第6项：景气度变化百分比，解释销量/价格为何浮动 */}
+                <MetricCard
+                  label="景气度"
+                  value={formatProsperityChange(company.prosperity, company.prev_prosperity)}
+                  hint={company.prev_prosperity > 0 ? `上期 ${company.prev_prosperity.toFixed(4)} → 本期 ${company.prosperity.toFixed(4)}` : undefined}
+                  colorClass={
+                    company.prev_prosperity > 0
+                      ? company.prosperity >= company.prev_prosperity
+                        ? 'text-accent-green'
+                        : 'text-accent-red'
+                      : undefined
+                  }
                 />
               </div>
           {company.can_liquidate && (
