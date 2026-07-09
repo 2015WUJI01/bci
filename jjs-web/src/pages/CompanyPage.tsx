@@ -828,7 +828,7 @@ function formatProsperityDeviation(prosperity: number): string {
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
-                        onClick={() => handleActionSelect('expand')}
+                        onClick={() => { setActionView('expand'); setActionAmount(0); setActionError('') }}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">🏭</span>
@@ -841,7 +841,7 @@ function formatProsperityDeviation(prosperity: number): string {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
-                        onClick={() => handleActionSelect('hire')}
+                        onClick={() => { setActionView('hire'); setActionAmount(0); setActionError('') }}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">👥</span>
@@ -854,7 +854,7 @@ function formatProsperityDeviation(prosperity: number): string {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-red hover:bg-accent-red/5 transition-colors"
-                        onClick={() => handleActionSelect('layoff')}
+                        onClick={() => { setActionView('layoff'); setActionAmount(0); setActionError('') }}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">📉</span>
@@ -867,7 +867,7 @@ function formatProsperityDeviation(prosperity: number): string {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-blue hover:bg-accent-blue/5 transition-colors"
-                        onClick={() => handleActionSelect('sell_assets')}
+                        onClick={() => { setActionView('sell_assets'); setActionAmount(0); setActionError('') }}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">🏷️</span>
@@ -882,7 +882,7 @@ function formatProsperityDeviation(prosperity: number): string {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-gold hover:bg-accent-gold/5 transition-colors"
-                        onClick={() => handleActionSelect('marketing')}
+                        onClick={() => { setActionView('marketing'); setActionAmount(0); setActionError('') }}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">📢</span>
@@ -895,7 +895,7 @@ function formatProsperityDeviation(prosperity: number): string {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-up hover:bg-up/5 transition-colors"
-                        onClick={() => handleActionSelect('dividend')}
+                        onClick={() => { setActionView('dividend'); setActionAmount(0); setActionError('') }}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">💵</span>
@@ -908,7 +908,7 @@ function formatProsperityDeviation(prosperity: number): string {
 
                       <button
                         className="text-left p-3 rounded border border-border bg-bg-input hover:border-accent-gold hover:bg-accent-gold/5 transition-colors col-span-2 md:col-span-3 lg:col-span-2"
-                        onClick={() => handleActionSelect('inject_capital')}
+                        onClick={() => { setActionView('inject_capital'); setActionAmount(0); setActionError('') }}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-base">💰</span>
